@@ -1,5 +1,13 @@
 # EduSubmit — Folder Structure
 
+**Update 2026-07-15:** the `(student)`/`(lecturer)`/`(admin)` route groups originally
+planned below were replaced with plain folders (`app/student/`, `app/lecturer/`,
+`app/admin/`) once Phase 3 was actually built — Next.js route groups don't add a
+URL segment, so grouped folders would have collided on the same `/dashboard` URL.
+Landing page (`(public)/page.tsx`) was also skipped per your instruction; `/`
+now just redirects to `/login` or a role dashboard. This doc reflects what's
+actually on disk.
+
 ```
 EduSubmit/
 ├── docs/                        # all project documentation (this folder)
@@ -8,36 +16,37 @@ EduSubmit/
 ├── PROJECT_STATUS.md
 ├── frontend/                    # Next.js 15 app
 │   ├── app/
-│   │   ├── (public)/
-│   │   │   ├── page.tsx                # landing page
-│   │   │   ├── login/page.tsx
-│   │   │   └── register/page.tsx
-│   │   ├── (student)/
+│   │   ├── page.tsx                     # redirects to /login or /{role}/dashboard
+│   │   ├── login/page.tsx
+│   │   ├── register/page.tsx            # student self-registration
+│   │   ├── student/
+│   │   │   ├── layout.tsx               # DashboardShell + student nav
 │   │   │   ├── dashboard/page.tsx
-│   │   │   ├── upload/page.tsx
-│   │   │   ├── submissions/page.tsx
-│   │   │   └── profile/page.tsx
-│   │   ├── (lecturer)/
+│   │   │   ├── upload/page.tsx          # placeholder — Phase 4
+│   │   │   ├── submissions/page.tsx     # placeholder — Phase 4
+│   │   │   └── profile/page.tsx         # placeholder — Phase 4
+│   │   ├── lecturer/
+│   │   │   ├── layout.tsx
 │   │   │   ├── dashboard/page.tsx
-│   │   │   ├── assignments/page.tsx
-│   │   │   └── review/[id]/page.tsx
-│   │   ├── (admin)/
+│   │   │   ├── assignments/page.tsx     # placeholder — Phase 4
+│   │   │   └── review/page.tsx          # placeholder — Phase 4
+│   │   ├── admin/
+│   │   │   ├── layout.tsx
 │   │   │   ├── dashboard/page.tsx
-│   │   │   ├── users/page.tsx
-│   │   │   ├── courses/page.tsx
-│   │   │   ├── submissions/page.tsx
-│   │   │   └── logs/page.tsx
-│   │   └── layout.tsx
+│   │   │   ├── users/page.tsx           # placeholder — Phase 5
+│   │   │   ├── courses/page.tsx         # placeholder — Phase 5
+│   │   │   ├── submissions/page.tsx     # placeholder — Phase 5
+│   │   │   └── logs/page.tsx            # placeholder — Phase 5
+│   │   ├── layout.tsx                   # root layout, Bootstrap import
+│   │   └── globals.css                  # palette + es-* utility classes
 │   ├── components/
-│   │   ├── ui/                          # buttons, cards, badges, modals
-│   │   ├── layout/                      # sidebar, topbar, mobile drawer
-│   │   ├── charts/
-│   │   └── forms/
+│   │   ├── ui/                          # StatCard, StatusBadge (growing)
+│   │   └── layout/                      # DashboardShell (sidebar/topbar/drawer)
 │   ├── lib/
-│   │   ├── api.ts                       # typed fetch wrapper + JWT attach
-│   │   ├── auth.ts                      # token storage, refresh logic
+│   │   ├── api.ts                       # typed fetch wrapper, JWT + auto-refresh
+│   │   ├── auth.ts                      # token storage, role cookie, JWT decode
 │   │   └── types.ts
-│   ├── middleware.ts                    # route guarding by role
+│   ├── middleware.ts                    # role-based route gating (UX only)
 │   ├── public/
 │   ├── .env.local.example
 │   ├── package.json
