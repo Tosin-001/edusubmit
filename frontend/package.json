@@ -1,0 +1,28 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development next dev",
+    "build": "next build",
+    "start": "cross-env NODE_ENV=production next start",
+    "lint": "eslint",
+    "postinstall": "echo Reminder: this machine has a global NODE_ENV=production shell var — run 'npm install' with NODE_ENV unset or =development if devDependencies go missing"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.8",
+    "next": "^15.5.20",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.20",
+    "typescript": "^5"
+  }
+}
