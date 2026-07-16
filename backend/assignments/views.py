@@ -8,16 +8,25 @@ from .serializers import AssignmentSerializer
 
 
 class AssignmentListCreateView(generics.ListCreateAPIView):
+    """
+    Read: any authenticated user (students need this to pick an assignment to
+    submit against). Write: Lecturer (own course only) or Admin.
+    """
+
     serializer_class = AssignmentSerializer
-    permission_classes = [IsLecturerOrAdmin]
     filterset_fields = ["course", "lecturer"]
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsLecturerOrAdmin()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         qs = Assignment.objects.select_related("course", "lecturer")
         user = self.request.user
         if user.is_lecturer:
             return qs.filter(course__lecturer=user)
-        return qs  # admin sees all
+        return qs  # students and admin see all
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -30,12 +39,16 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
 
 class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AssignmentSerializer
-    permission_classes = [IsLecturerOrAdmin]
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsLecturerOrAdmin()]
 
     def get_queryset(self):
         qs = Assignment.objects.select_related("course", "lecturer")
         user = self.request.user
-        if user.is_lecturer:
+        if self.request.method != "GET" and user.is_lecturer:
             return qs.filter(course__lecturer=user)
         return qs
 

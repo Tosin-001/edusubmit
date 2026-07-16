@@ -1,10 +1,212 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch, ApiError, uploadWithProgress } from "@/lib/api";
+import type { Assignment, Course, Submission } from "@/lib/types";
+
+interface Paginated<T> {
+  results?: T[];
+}
+
+function unwrap<T>(data: Paginated<T> | T[]): T[] {
+  return Array.isArray(data) ? data : (data.results ?? []);
+}
+
 export default function UploadPage() {
+  const router = useRouter();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [courseId, setCourseId] = useState<string>("");
+  const [assignmentId, setAssignmentId] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    apiFetch<Paginated<Course> | Course[]>("/courses/").then((data) => setCourses(unwrap(data)));
+  }, []);
+
+  useEffect(() => {
+    if (!courseId) {
+      setAssignments([]);
+      setAssignmentId("");
+      return;
+    }
+    apiFetch<Paginated<Assignment> | Assignment[]>(`/assignments/?course=${courseId}`).then((data) =>
+      setAssignments(unwrap(data))
+    );
+  }, [courseId]);
+
+  const selectedAssignment = useMemo(
+    () => assignments.find((a) => String(a.id) === assignmentId) ?? null,
+    [assignments, assignmentId]
+  );
+
+  function validateFile(f: File): string | null {
+    const allowed = (selectedAssignment?.allowed_file_types ?? "pdf,docx,doc,zip").split(",");
+    const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!allowed.includes(ext)) {
+      return `File type .${ext} not allowed. Allowed: ${allowed.join(", ")}`;
+    }
+    const maxMb = selectedAssignment?.max_file_size_mb ?? 15;
+    if (f.size > maxMb * 1024 * 1024) {
+      return `File exceeds the ${maxMb}MB limit.`;
+    }
+    return null;
+  }
+
+  function handleFileSelect(f: File) {
+    const validationError = validateFile(f);
+    if (validationError) {
+      setError(validationError);
+      setFile(null);
+      return;
+    }
+    setError(null);
+    setFile(f);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = e.dataTransfer.files?.[0];
+    if (dropped) handleFileSelect(dropped);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file || !assignmentId) {
+      setError("Please choose a course, an assignment, and a file.");
+      return;
+    }
+    setError(null);
+    setProgress(0);
+
+    const formData = new FormData();
+    formData.append("assignment", assignmentId);
+    formData.append("file", file);
+
+    try {
+      await uploadWithProgress<Submission>("/submissions/", formData, setProgress);
+      setSuccess(true);
+      setTimeout(() => router.push("/student/submissions"), 1200);
+    } catch (err) {
+      if (err instanceof ApiError && err.body && typeof err.body === "object") {
+        const body = err.body as Record<string, string[]>;
+        setError(body.file?.[0] ?? body.assignment?.[0] ?? body.detail?.[0] ?? "Upload failed.");
+      } else {
+        setError("Upload failed. Please try again.");
+      }
+      setProgress(null);
+    }
+  }
+
   return (
-    <div className="es-card bg-white p-4">
-      <h1 className="h5 fw-bold mb-2">Upload Assignment</h1>
-      <p className="text-muted mb-0">
-        Coming in Phase 4: course/assignment picker, drag-and-drop upload, progress bar.
-      </p>
+    <div className="es-card bg-white p-4 p-md-5" style={{ maxWidth: 640 }}>
+      <h1 className="h5 fw-bold mb-4">Upload Assignment</h1>
+
+      {success && <div className="alert alert-success py-2">Submitted! Redirecting…</div>}
+      {error && <div className="alert alert-danger py-2">{error}</div>}
+
+      <form onSubmit={handleSubmit}>
+        <div className="mb-3">
+          <label className="form-label small fw-semibold">Course</label>
+          <select
+            className="form-select"
+            value={courseId}
+            onChange={(e) => setCourseId(e.target.value)}
+            required
+          >
+            <option value="">Select a course…</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.course_code} — {c.course_title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mb-4">
+          <label className="form-label small fw-semibold">Assignment</label>
+          <select
+            className="form-select"
+            value={assignmentId}
+            onChange={(e) => setAssignmentId(e.target.value)}
+            disabled={!courseId}
+            required
+          >
+            <option value="">
+              {courseId ? "Select an assignment…" : "Choose a course first"}
+            </option>
+            {assignments.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title}
+              </option>
+            ))}
+          </select>
+          {selectedAssignment?.description && (
+            <div className="form-text">{selectedAssignment.description}</div>
+          )}
+        </div>
+
+        <div
+          className="mb-4 p-4 text-center rounded-3"
+          style={{
+            border: `2px dashed ${dragOver ? "var(--es-primary)" : "#cbd5e1"}`,
+            backgroundColor: dragOver ? "rgba(37,99,235,0.05)" : "transparent",
+            cursor: "pointer",
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => document.getElementById("es-file-input")?.click()}
+        >
+          {file ? (
+            <span className="fw-semibold">{file.name}</span>
+          ) : (
+            <>
+              <div>Drag & drop file here, or click to browse</div>
+              <div className="text-muted small mt-1">
+                {(selectedAssignment?.allowed_file_types ?? "pdf,docx,doc,zip").toUpperCase()} · max{" "}
+                {selectedAssignment?.max_file_size_mb ?? 15}MB
+              </div>
+            </>
+          )}
+          <input
+            id="es-file-input"
+            type="file"
+            className="d-none"
+            onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+          />
+        </div>
+
+        {progress !== null && (
+          <div className="progress mb-4" style={{ height: 8 }}>
+            <div
+              className="progress-bar"
+              role="progressbar"
+              style={{ width: `${progress}%`, backgroundColor: "var(--es-primary)" }}
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            />
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="btn es-btn-primary text-white w-100"
+          disabled={progress !== null && progress < 100 && !error}
+        >
+          {progress !== null && progress < 100 ? `Uploading… ${progress}%` : "Submit Assignment"}
+        </button>
+      </form>
     </div>
   );
 }

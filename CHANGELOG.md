@@ -60,3 +60,31 @@ Why: Confirms the frontend actually compiles and builds, not just "looks plausib
 
 **16:22 WAT** | Committed & pushed | `github.com/Tosin-001/edusubmit` `main` (44 files)
 Why: Phase 3 baseline.
+
+
+## 2026-07-16
+
+**Local dev environment fully wired up.**
+
+**Postgres password reset** — user ran the trust-mode script in an elevated PowerShell (verified `pg_hba.conf` byte-identical to backup before and after; auth restored to `scram-sha-256` post-reset).
+
+**Created** `backend/.env` (real SECRET_KEY, DB credentials, JWT/upload settings) and `frontend/.env.local` — both gitignored, never committed.
+Why: `.env.example` files existed but no real `.env` — API couldn't serve requests without them.
+
+**Ran** `manage.py migrate` — all 34 migrations applied cleanly across 10 apps (5 ours + Django's auth/admin/contenttypes/sessions/token_blacklist).
+
+**Created** Django superuser: `admin@edusubmit.local` (role=admin). Credentials shared with user directly, not stored in any tracked file.
+
+**Verified end-to-end**: started `runserver`, POSTed to `/api/v1/auth/login/` with the superuser credentials, got back a valid JWT pair with `role`/`full_name` claims (HTTP 200). Confirms backend + DB + JWT auth actually work together, not just "migrations ran."
+
+**16:35 WAT (Phase 4 start)** | Fixed | `backend/assignments/views.py` (backed up first)
+Why: `/api/v1/assignments/` was Lecturer/Admin-only for GET, which meant Students had no way to see what assignments exist to upload against — a real functional gap caught while starting the Phase 4 upload UI, not a spec ambiguity. Now GET is open to any authenticated user (students see all assignments read-only); POST/PATCH/DELETE remain Lecturer(own course)/Admin-only, unchanged.
+
+
+## 2026-07-16 (cont'd) — Phase 4 (Student upload flow)
+
+**Created** `frontend/app/student/upload/page.tsx` — course/assignment dependent dropdowns, drag-and-drop zone, client-side file type/size validation (mirrors assignment's `allowed_file_types`/`max_file_size_mb`), real upload progress bar via a new `uploadWithProgress()` helper in `lib/api.ts` (XHR-based, since `fetch` has no upload progress event), success redirect to My Submissions.
+
+**Created** `frontend/app/student/submissions/page.tsx` — live table (desktop) / stacked cards (mobile) of the student's own submissions, search + status filter, status badges, grade/feedback columns.
+
+**Verified end-to-end** with a fresh test account: registered → logged in → GET `/assignments/` → GET `/courses/` all returned 200. Test account left in the DB (`teststudent@edusubmit.local`) — fine for local dev, flagging in case you want it removed before demoing.

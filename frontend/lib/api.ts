@@ -79,3 +79,58 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
+
+
+/**
+ * Multipart upload with real progress reporting (fetch has no upload
+ * progress event, so this uses XHR). Attaches the JWT and retries once on
+ * 401 via refresh, same as apiFetch.
+ */
+export function uploadWithProgress<T>(
+  path: string,
+  formData: FormData,
+  onProgress: (percent: number) => void
+): Promise<T> {
+  const doUpload = (token: string | null) =>
+    new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${API_BASE}${path}`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        let body: unknown = null;
+        try {
+          body = JSON.parse(xhr.responseText);
+        } catch {
+          /* no JSON body */
+        }
+        resolve({ status: xhr.status, body });
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload."));
+      xhr.send(formData);
+    });
+
+  return (async () => {
+    let token = getAccessToken();
+    let { status, body } = await doUpload(token);
+
+    if (status === 401) {
+      refreshingPromise ??= refreshAccessToken().finally(() => {
+        refreshingPromise = null;
+      });
+      token = await refreshingPromise;
+      if (!token) {
+        clearTokens();
+        clearRoleCookie();
+        if (typeof window !== "undefined") window.location.href = "/login";
+        throw new ApiError(401, body);
+      }
+      ({ status, body } = await doUpload(token));
+    }
+
+    if (status < 200 || status >= 300) throw new ApiError(status, body);
+    return body as T;
+  })();
+}
