@@ -88,3 +88,7 @@ Why: `/api/v1/assignments/` was Lecturer/Admin-only for GET, which meant Student
 **Created** `frontend/app/student/submissions/page.tsx` — live table (desktop) / stacked cards (mobile) of the student's own submissions, search + status filter, status badges, grade/feedback columns.
 
 **Verified end-to-end** with a fresh test account: registered → logged in → GET `/assignments/` → GET `/courses/` all returned 200. Test account left in the DB (`teststudent@edusubmit.local`) — fine for local dev, flagging in case you want it removed before demoing.
+
+
+**16:50 WAT** | Created | `backend/accounts/management/commands/seed_demo.py` (`python manage.py seed_demo`)
+Why: Upload page dropdowns were empty — no courses/assignments existed. Rather than a throwaway script, added a proper idempotent management command (safe to re-run) that seeds one demo Lecturer (`lecturer@edusubmit.local`), one Course (`CSC301`, assigned to that lecturer), and one Assignment. Verified via live API request that the seeded course/assignment now appear for a student's `/courses/` and `/assignments/` calls.

@@ -36,8 +36,7 @@ Phase 4 partially complete (Student upload flow done). Next: Lecturer Review Que
 2. `/admin/users/{id}/submissions/` not wired to its own endpoint — reachable via `/admin/submissions/?search=<matric_number>`. Low priority.
 3. Student profile, Lecturer assignments, and all Admin management pages are still placeholder screens.
 4. A test student account (`teststudent@edusubmit.local`) exists in the local DB from end-to-end verification — harmless for dev, delete before any demo if it matters.
-5. No courses/assignments exist yet in the DB — the upload page will show empty dropdowns until an Admin creates a course + assigns a lecturer, and that lecturer creates an assignment (both doable right now via Django admin at `/admin/` even though the dedicated UI is Phase 5).
+5. No courses/assignments existed until seeded — `python manage.py seed_demo` now creates a demo Lecturer (`lecturer@edusubmit.local`), Course `CSC301`, and one Assignment. Idempotent, safe to re-run. Real data still needs Admin-created courses via Phase 5 UI (or Django admin at `/admin/` in the meantime).
 
 ## Open Questions For You
-1. Want me to seed a test course + lecturer + assignment via Django admin so you can actually test the upload flow end-to-end in the browser, or will you create real ones?
-2. Should I delete the `teststudent@edusubmit.local` test account now, or leave it for your own testing?
+1. When you're ready to test the upload flow in the browser: log in as `teststudent@edusubmit.local`, go to Upload, pick CSC301 → Assignment 1, and try a real file.
