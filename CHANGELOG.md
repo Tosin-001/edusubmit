@@ -92,3 +92,16 @@ Why: `/api/v1/assignments/` was Lecturer/Admin-only for GET, which meant Student
 
 **16:50 WAT** | Created | `backend/accounts/management/commands/seed_demo.py` (`python manage.py seed_demo`)
 Why: Upload page dropdowns were empty — no courses/assignments existed. Rather than a throwaway script, added a proper idempotent management command (safe to re-run) that seeds one demo Lecturer (`lecturer@edusubmit.local`), one Course (`CSC301`, assigned to that lecturer), and one Assignment. Verified via live API request that the seeded course/assignment now appear for a student's `/courses/` and `/assignments/` calls.
+
+
+## 2026-07-16 (cont'd) — Phase 4 complete (Lecturer Review Queue)
+
+**Created** `frontend/app/lecturer/review/page.tsx` — split view: submission list (own courses only, via existing `/lecturers/me/submissions/`) on the left, grading form on the right. Selecting a submission fetches full detail, form PATCHes the existing `/submissions/{id}/review/` endpoint (grade, status, feedback, review_notes). List refreshes after save so status badges update immediately.
+
+**Added** `downloadFile()` to `lib/api.ts` — the `/submissions/{id}/download/` endpoint needs the JWT header, which a plain `<a href>` can't send, so this fetches as a blob and triggers a browser save via a temporary object URL. Used by the review form's "Download File" button.
+
+**Verified**: `npx tsc --noEmit` clean, `npm run build` clean (all 16 routes, `/lecturer/review` now ~3KB of real content vs. the ~140B placeholder).
+
+**Note:** hit a transient Windows issue mid-build — a prior `npm run build` left orphaned `node` processes holding file locks on `.next/trace`, causing later builds to hang indefinitely. Killed all `node` processes and cleared `.next` before the final successful build. Not a code issue; flagging in case it recurs.
+
+**Phase 4 is now done**: Student upload flow + Lecturer Review Queue both live and wired end-to-end to the Phase 2 API.

@@ -134,3 +134,25 @@ export function uploadWithProgress<T>(
     return body as T;
   })();
 }
+
+
+/**
+ * Downloads a protected file (needs the JWT header, so a plain <a href>
+ * won't work) and triggers a browser save via a temporary object URL.
+ */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new ApiError(res.status, null);
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}

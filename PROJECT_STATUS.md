@@ -7,26 +7,26 @@ Assignment Submission and Administration System.
 Stack: Next.js 15 + TypeScript + Bootstrap 5 (frontend) | Django 4.2 LTS + DRF + PostgreSQL (backend) | JWT auth.
 Roles: Student, Lecturer, Admin. Courses are Admin-assigned. Admin can override Lecturer reviews.
 Repo: https://github.com/Tosin-001/edusubmit (main branch, pushed)
-Local dev: Postgres running, `backend/.env` + `frontend/.env.local` configured, migrations applied, superuser created.
+Local dev: Postgres running, `backend/.env` + `frontend/.env.local` configured, migrations applied, superuser + demo lecturer/course/assignment seeded.
 
 ## Completed Tasks
 - [x] Local project folder + `/docs`, `/backups`, `PROJECT_STATUS.md`, `CHANGELOG.md`
 - [x] Phase 1: architecture, DB ERD, API map, folder structure, user flows, wireframes — approved
 - [x] Phase 2: Django backend scaffold (accounts, academics, assignments, submissions, activitylogs)
 - [x] Phase 3: Next.js 15 frontend scaffold — auth, role-gated middleware, 3 live dashboards
-- [x] Local environment fully wired: Postgres password reset, `.env` files created, `migrate` applied (34 migrations, 10 apps), superuser created (`admin@edusubmit.local`), verified end-to-end via live login request
-- [x] Phase 4 (in progress): Student upload flow
-  - Fixed a real gap: `/assignments/` was Lecturer/Admin-only for GET — students had no way to see what to submit against. Now readable by any authenticated user.
-  - `app/student/upload/page.tsx` — course→assignment dropdowns, drag-and-drop, client-side validation, real progress bar (new `uploadWithProgress()` in `lib/api.ts`)
+- [x] Local environment fully wired: Postgres reset, `.env` files created, migrations applied, superuser + demo data seeded, verified end-to-end
+- [x] **Phase 4 complete: Assignment upload UI + review workflow UI**
+  - Fixed a real gap: `/assignments/` was Lecturer/Admin-only for GET — students couldn't see what to submit against. Now readable by any authenticated user.
+  - `app/student/upload/page.tsx` — course→assignment dropdowns, drag-and-drop, client-side validation, real progress bar
   - `app/student/submissions/page.tsx` — live table/cards, search + status filter
-  - `npx tsc --noEmit` clean, `npm run build` clean, verified live against the running API (register→login→list assignments→list courses, all 200)
+  - `app/lecturer/review/page.tsx` — submission list (own courses) + grading form (grade/status/feedback/notes), file download via a new `downloadFile()` helper
+  - `npx tsc --noEmit` clean, `npm run build` clean throughout
 
 ## Current Task
-Phase 4 partially complete (Student upload flow done). Next: Lecturer Review Queue + grading form.
+Phase 4 complete. **Awaiting your go-ahead for Phase 5 (Admin/Lecturer management panel UI).**
 
 ## Pending / Not Started
-- Phase 4 (remaining): Lecturer Review Queue page (list submissions to own courses, grade/feedback form, calls existing `PATCH /submissions/{id}/review/`)
-- Phase 5: Admin/Lecturer management panel UI (users, courses, submissions, activity logs — currently placeholder pages)
+- Phase 5: Admin/Lecturer management panel UI (users, courses, submissions, activity logs — currently placeholder pages; Lecturer "Assignments" create/edit UI also still placeholder)
 - Phase 6: Styling pass / responsive QA beyond the current baseline
 - Phase 7: Deployment (Vercel + Railway/Render)
 - Phase 8: Testing & hardening (unit tests, DRF test client, file upload edge cases)
@@ -34,9 +34,10 @@ Phase 4 partially complete (Student upload flow done). Next: Lecturer Review Que
 ## Known Issues
 1. **Django pinned to 4.2.13, not 5.0.6** — driven by your Python 3.9.5.
 2. `/admin/users/{id}/submissions/` not wired to its own endpoint — reachable via `/admin/submissions/?search=<matric_number>`. Low priority.
-3. Student profile, Lecturer assignments, and all Admin management pages are still placeholder screens.
-4. A test student account (`teststudent@edusubmit.local`) exists in the local DB from end-to-end verification — harmless for dev, delete before any demo if it matters.
-5. No courses/assignments existed until seeded — `python manage.py seed_demo` now creates a demo Lecturer (`lecturer@edusubmit.local`), Course `CSC301`, and one Assignment. Idempotent, safe to re-run. Real data still needs Admin-created courses via Phase 5 UI (or Django admin at `/admin/` in the meantime).
+3. Student profile, Lecturer assignments create/edit, and all Admin management pages are still placeholder screens — Phase 5.
+4. Test accounts in local DB (harmless, yours to clean up whenever): `teststudent@edusubmit.local`, `lecturer@edusubmit.local` (from `seed_demo`), `admin@edusubmit.local` (superuser).
+5. A transient Windows issue hit during Phase 4: orphaned `node` processes from an interrupted build held file locks and caused a later build to hang. Resolved by killing all `node` processes + clearing `.next`. Not a code bug, but if a future `npm run build` seems to hang forever, check `Get-Process node` first.
 
 ## Open Questions For You
-1. When you're ready to test the upload flow in the browser: log in as `teststudent@edusubmit.local`, go to Upload, pick CSC301 → Assignment 1, and try a real file.
+1. Try the full loop now if you want: log in as `teststudent@edusubmit.local` → Upload → CSC301/Assignment 1 → submit a file. Then log in as `lecturer@edusubmit.local` → Review Queue → grade it. Then check the student dashboard for the grade/feedback.
+2. Phase 5 start: Admin user management first, or Admin course management first?
