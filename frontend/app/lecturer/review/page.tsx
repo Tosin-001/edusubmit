@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, downloadFile, ApiError } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import type { Submission, SubmissionStatus } from "@/lib/types";
+import type { Course, Submission, SubmissionStatus } from "@/lib/types";
 
 interface Paginated<T> {
   results?: T[];
@@ -21,7 +21,19 @@ const STATUS_OPTIONS: SubmissionStatus[] = [
   "rejected",
 ];
 
+const STATUS_FILTERS: { value: SubmissionStatus | ""; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "submitted", label: "Submitted" },
+  { value: "under_review", label: "Under Review" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+];
+
 export default function ReviewQueuePage() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [activeCourse, setActiveCourse] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "">("");
+
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Submission | null>(null);
@@ -29,16 +41,30 @@ export default function ReviewQueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const [form, setForm] = useState({ status: "submitted" as SubmissionStatus, grade: "", feedback: "", review_notes: "" });
+  const [form, setForm] = useState({
+    status: "submitted" as SubmissionStatus,
+    grade: "",
+    feedback: "",
+    review_notes: "",
+  });
+
+  useEffect(() => {
+    apiFetch<Paginated<Course> | Course[]>("/lecturers/me/courses/").then((data) =>
+      setCourses(unwrap(data))
+    );
+  }, []);
 
   function loadList() {
     setLoading(true);
-    apiFetch<Paginated<Submission> | Submission[]>("/lecturers/me/submissions/?ordering=-submitted_at")
+    const params = new URLSearchParams({ ordering: "-submitted_at" });
+    if (activeCourse !== "all") params.set("assignment__course", activeCourse);
+    if (statusFilter) params.set("status", statusFilter);
+    apiFetch<Paginated<Submission> | Submission[]>(`/lecturers/me/submissions/?${params}`)
       .then((data) => setSubmissions(unwrap(data)))
       .finally(() => setLoading(false));
   }
 
-  useEffect(loadList, []);
+  useEffect(loadList, [activeCourse, statusFilter]);
 
   useEffect(() => {
     if (!selected) return;
@@ -92,14 +118,52 @@ export default function ReviewQueuePage() {
 
   return (
     <div>
-      <h1 className="h4 fw-bold mb-4">Review Queue</h1>
+      <h1 className="h4 fw-bold mb-3">Review Queue</h1>
+
+      <ul className="nav nav-pills flex-nowrap overflow-auto mb-3 gap-1" style={{ whiteSpace: "nowrap" }}>
+        <li className="nav-item">
+          <button
+            type="button"
+            className={`nav-link ${activeCourse === "all" ? "active" : ""}`}
+            onClick={() => setActiveCourse("all")}
+          >
+            All
+          </button>
+        </li>
+        {courses.map((c) => (
+          <li className="nav-item" key={c.id}>
+            <button
+              type="button"
+              className={`nav-link ${activeCourse === String(c.id) ? "active" : ""}`}
+              onClick={() => setActiveCourse(String(c.id))}
+            >
+              {c.course_code}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mb-3" style={{ maxWidth: 220 }}>
+        <select
+          className="form-select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as SubmissionStatus | "")}
+        >
+          {STATUS_FILTERS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="row g-3">
         <div className="col-lg-5">
           <div className="es-card bg-white p-0 overflow-hidden">
             {loading ? (
               <div className="p-3 text-muted">Loading…</div>
             ) : submissions.length === 0 ? (
-              <div className="p-3 text-muted small">No submissions yet for your courses.</div>
+              <div className="p-3 text-muted small">No submissions match these filters.</div>
             ) : (
               <ul className="list-group list-group-flush">
                 {submissions.map((s) => (

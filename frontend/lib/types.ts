@@ -43,6 +43,9 @@ export interface Assignment {
   max_score: number;
   allowed_file_types: string;
   max_file_size_mb: number;
+  is_archived: boolean;
+  is_past_due: boolean;
+  submission_count: number;
   created_at: string;
 }
 

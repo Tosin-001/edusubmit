@@ -19,6 +19,7 @@ class Assignment(models.Model):
     max_score = models.PositiveIntegerField(default=100)
     allowed_file_types = models.CharField(max_length=50, default="pdf,docx,doc,zip")
     max_file_size_mb = models.PositiveIntegerField(default=15)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

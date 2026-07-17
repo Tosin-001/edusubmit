@@ -105,3 +105,18 @@ Why: Upload page dropdowns were empty — no courses/assignments existed. Rather
 **Note:** hit a transient Windows issue mid-build — a prior `npm run build` left orphaned `node` processes holding file locks on `.next/trace`, causing later builds to hang indefinitely. Killed all `node` processes and cleared `.next` before the final successful build. Not a code issue; flagging in case it recurs.
 
 **Phase 4 is now done**: Student upload flow + Lecturer Review Queue both live and wired end-to-end to the Phase 2 API.
+
+
+## 2026-07-17 — Phase 5, Items 1–2 (Lecturer Assignment Management, Review Queue improvements)
+
+**Fixed a real pre-existing bug**: `search_fields` was set on several views (courses, submissions, now assignments) since Phase 2, but `REST_FRAMEWORK.DEFAULT_FILTER_BACKENDS` never included `rest_framework.filters.SearchFilter` — only `DjangoFilterBackend`. Every `?search=` param across the whole API has been silently doing nothing since Phase 2. Also added `OrderingFilter`, since `?ordering=` was already used in frontend code (Student Dashboard, Review Queue) and had the same problem. Fixed in `config/settings.py`.
+
+**Backend**: added `is_archived` (BooleanField) to `Assignment` — migration `0002_assignment_is_archived`. "Delete" for assignments is implemented as archive (`PATCH is_archived=true`), not hard `DELETE`, because `Assignment` cascades to `Submission` — a real delete would destroy every student's grade/feedback history for that assignment. Hard `DELETE` endpoint still exists (Admin-only in practice) but the Lecturer UI never calls it. `AssignmentListCreateView` now hides archived by default (`?archived=true` to see only archived, `?archived=all` for everything), plus `search_fields` (title, course code/title). Serializer gained `is_archived`, `is_past_due` (computed), `submission_count`.
+
+**Created** `frontend/app/lecturer/assignments/page.tsx` — full CRUD: create/edit modal (course/title/description/due date/max score), searchable + status-filterable (Active/Archived/All) table (desktop) / cards (mobile), Archive/Restore action.
+
+**Created** `frontend/components/ui/Modal.tsx` — reusable modal, will be reused for Admin sections next.
+
+**Updated** `frontend/app/lecturer/review/page.tsx` — added course tabs (`All` + one per the lecturer's own courses, via existing `/lecturers/me/courses/`) and a status filter dropdown, both driving the existing `/lecturers/me/submissions/` endpoint's `assignment__course`/`status` query params.
+
+**Verified live** end-to-end as the seeded demo lecturer: create assignment (201) → archive it (200) → search+archived-filter finds it (200) → review queue course/status filters (200).
