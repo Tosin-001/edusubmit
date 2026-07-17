@@ -31,19 +31,27 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "role", "created_at"]
 
 
-class AdminCreateStaffSerializer(serializers.ModelSerializer):
-    """Admin-only: create Lecturer or Admin accounts (no public signup for these roles)."""
+class AdminCreateUserSerializer(serializers.ModelSerializer):
+    """
+    Admin-only: create a Student, Lecturer, or Admin account directly (no
+    public signup for lecturer/admin; this also gives Admin a way to create
+    a student without the student self-registering).
+    """
 
     password = serializers.CharField(write_only=True, validators=[validate_password])
 
     class Meta:
         model = User
-        fields = ["full_name", "staff_id", "email", "department", "role", "password"]
+        fields = ["id", "full_name", "matric_number", "staff_id", "email", "department", "role", "password"]
+        read_only_fields = ["id"]
 
-    def validate_role(self, value):
-        if value not in (User.Role.LECTURER, User.Role.ADMIN):
-            raise serializers.ValidationError("Role must be lecturer or admin.")
-        return value
+    def validate(self, attrs):
+        role = attrs.get("role")
+        if role == User.Role.STUDENT and not attrs.get("matric_number"):
+            raise serializers.ValidationError({"matric_number": "Required for student accounts."})
+        if role in (User.Role.LECTURER, User.Role.ADMIN) and not attrs.get("staff_id"):
+            raise serializers.ValidationError({"staff_id": "Required for lecturer/admin accounts."})
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop("password")
@@ -53,6 +61,20 @@ class AdminCreateStaffSerializer(serializers.ModelSerializer):
         return user
 
 
+# Backward-compatible alias — some code/tests may still import the old name.
+AdminCreateStaffSerializer = AdminCreateUserSerializer
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+
+class AdminResetPasswordSerializer(serializers.Serializer):
+    """
+    Admin-only: reset another user's password. If new_password is omitted,
+    the view generates a random one and returns it in the response so the
+    admin can hand it to the user out-of-band.
+    """
+
+    new_password = serializers.CharField(write_only=True, required=False, validators=[validate_password])

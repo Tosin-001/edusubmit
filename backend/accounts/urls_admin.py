@@ -3,12 +3,13 @@ from django.urls import path
 from academics.views import CourseListCreateView, CourseDetailView
 from activitylogs.views import ActivityLogListView
 from submissions.views import AdminDashboardView, AdminSubmissionListView, AdminSubmissionDeleteView
-from .views import AdminUserDetailView, AdminUserListCreateView
+from .views import AdminResetPasswordView, AdminUserDetailView, AdminUserListCreateView
 
 urlpatterns = [
     path("dashboard/", AdminDashboardView.as_view(), name="admin-dashboard"),
     path("users/", AdminUserListCreateView.as_view(), name="admin-users"),
     path("users/<int:pk>/", AdminUserDetailView.as_view(), name="admin-user-detail"),
+    path("users/<int:pk>/reset-password/", AdminResetPasswordView.as_view(), name="admin-user-reset-password"),
     path("courses/", CourseListCreateView.as_view(), name="admin-courses"),
     path("courses/<int:pk>/", CourseDetailView.as_view(), name="admin-course-detail"),
     path("submissions/", AdminSubmissionListView.as_view(), name="admin-submissions"),

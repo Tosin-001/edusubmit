@@ -146,11 +146,16 @@ class SubmissionReviewView(generics.UpdateAPIView):
 # ---------- Admin ----------
 
 class AdminSubmissionListView(generics.ListAPIView):
-    """GET /admin/submissions/ — all submissions, search by name/matric/course, filter status/date/course."""
+    """
+    GET /admin/submissions/ — all submissions.
+    Filter: ?status=, ?assignment__course=, ?assignment__lecturer=, ?student=
+    Search: ?search= (student name/matric, course code)
+    Date range: ?date_from=YYYY-MM-DD, ?date_to=YYYY-MM-DD
+    """
 
     serializer_class = SubmissionDetailSerializer
     permission_classes = [IsAdmin]
-    filterset_fields = ["status", "assignment__course"]
+    filterset_fields = ["status", "assignment__course", "assignment__lecturer", "student"]
     search_fields = ["student__full_name", "student__matric_number", "assignment__course__course_code"]
 
     def get_queryset(self):
