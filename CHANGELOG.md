@@ -120,3 +120,22 @@ Why: Upload page dropdowns were empty — no courses/assignments existed. Rather
 **Updated** `frontend/app/lecturer/review/page.tsx` — added course tabs (`All` + one per the lecturer's own courses, via existing `/lecturers/me/courses/`) and a status filter dropdown, both driving the existing `/lecturers/me/submissions/` endpoint's `assignment__course`/`status` query params.
 
 **Verified live** end-to-end as the seeded demo lecturer: create assignment (201) → archive it (200) → search+archived-filter finds it (200) → review queue course/status filters (200).
+
+
+## 2026-07-17 (cont'd) — Phase 5, Items 3–4 (Admin Management, Activity Logs)
+
+**Backend**: renamed `AdminCreateStaffSerializer` → `AdminCreateUserSerializer` (old name kept as an alias) and broadened it to create Student accounts too, not just Lecturer/Admin — Admin can now create any role directly. Added `AdminResetPasswordSerializer` + `AdminResetPasswordView` (`POST /admin/users/{id}/reset-password/`) — generates a random password if none is supplied, returns it once in the response for the admin to relay. `AdminUserDetailView.perform_update` now logs `admin.user_activated`/`admin.user_deactivated` specifically (was generic `admin.user_updated`) by diffing `is_active` before/after, same pattern as the assignment archive logging. Broadened `AdminSubmissionListView` filters to include `assignment__lecturer` and `student` (was course/status only). Added date-range filtering (`date_from`/`date_to`) and search to `ActivityLogListView`.
+
+**Fixed a real bug caught during live testing**: `AdminCreateUserSerializer`'s `fields` didn't include `id`, so the create-user response had no way to know the new user's ID — the reset-password/deactivate flow that immediately follows creation would have silently failed in the UI. Added `id` as read-only.
+
+**Created** `frontend/app/admin/users/page.tsx` — full CRUD, role-aware create form (matric number for students, staff ID for lecturer/admin), search + role/status filters, activate/deactivate toggle, reset-password action (shows the generated password once in a modal).
+
+**Created** `frontend/app/admin/courses/page.tsx` — create/edit courses, lecturer assignment dropdown (sourced from `/admin/users/?role=lecturer`), search.
+
+**Created** `frontend/app/admin/submissions/page.tsx` — same split list/review-form pattern as the Lecturer Review Queue, but with course + lecturer + student + status filters, and both an override-review capability (Admin can re-grade any submission, including ones a Lecturer already reviewed) and a real hard-delete (unlike Assignment archiving — a single submission record has no cascade risk, and "Delete Submission" was explicit in the original spec).
+
+**Created** `frontend/app/admin/logs/page.tsx` — action-type filter, date range, search, friendly labels for every logged action, metadata summary column (title/status/grade/role as applicable).
+
+**Debugging detour**: hit an intermittent local-dev issue where the `admin@edusubmit.local` password appeared to silently revert between test runs, even though the DB write was confirmed correct via an in-process Django test client. Root cause looked like a stale/orphaned `runserver` process from an earlier `force_terminate` not fully releasing port 8000. Fully killing all `python` processes and starting a completely fresh `runserver` resolved it. Not a code bug — flagging in `PROJECT_STATUS.md` in case it recurs, same category as the earlier orphaned-`node` build issue.
+
+**Verified live**: login, activity-logs filter-by-action/date-range/search, admin user create/reset-password/deactivate — all confirmed working end-to-end against a fresh server process.

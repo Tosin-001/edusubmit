@@ -76,3 +76,14 @@ export interface Submission {
   submitted_at: string;
   reviewed_at: string | null;
 }
+
+
+export interface ActivityLog {
+  id: number;
+  user: number | null;
+  user_name: string | null;
+  action: string;
+  metadata: Record<string, unknown> | null;
+  ip_address: string | null;
+  timestamp: string;
+}
