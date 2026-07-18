@@ -57,8 +57,16 @@ class ChangePasswordView(APIView):
         return Response({"detail": "Password updated."})
 
 
-class MeView(generics.RetrieveUpdateAPIView):
-    """GET/PATCH the logged-in user's own profile — used by all 3 roles."""
+class MeView(generics.RetrieveAPIView):
+    """
+    GET the logged-in user's own profile — used by all 3 roles.
+    Read-only by design: name/email/matric or staff ID/department are
+    Admin-assigned academic/identity details. Students and Lecturers cannot
+    edit their own profile (they previously could via PATCH here — that was
+    an unintended permission gap, closed 2026-07-18). Only Admin can change
+    these fields, via AdminUserDetailView. Password changes are unaffected
+    (separate ChangePasswordView, not a profile-editing concern).
+    """
 
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]

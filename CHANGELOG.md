@@ -139,3 +139,12 @@ Why: Upload page dropdowns were empty — no courses/assignments existed. Rather
 **Debugging detour**: hit an intermittent local-dev issue where the `admin@edusubmit.local` password appeared to silently revert between test runs, even though the DB write was confirmed correct via an in-process Django test client. Root cause looked like a stale/orphaned `runserver` process from an earlier `force_terminate` not fully releasing port 8000. Fully killing all `python` processes and starting a completely fresh `runserver` resolved it. Not a code bug — flagging in `PROJECT_STATUS.md` in case it recurs, same category as the earlier orphaned-`node` build issue.
 
 **Verified live**: login, activity-logs filter-by-action/date-range/search, admin user create/reset-password/deactivate — all confirmed working end-to-end against a fresh server process.
+
+
+## 2026-07-18 — Read-only Profile pages + a real permission gap closed
+
+**Fixed a real permission gap**: `MeView` (`/students/me/`, `/lecturers/me/`) was `RetrieveUpdateAPIView` — students and lecturers could PATCH their own `full_name`, `email`, `matric_number`/`staff_id`, and `department` with no restriction. Nothing in the frontend exposed this (the old placeholder Profile page had no edit form), but the API allowed it directly. Changed to `RetrieveAPIView` (read-only). Password changes are unaffected — separate `ChangePasswordView`, not a profile-editing concern. Verified live: GET still 200, PATCH now 405.
+
+**Created** `frontend/components/profile/MyProfile.tsx` — shared read-only profile component (name/email/matric-or-staff-ID/department, labeled "Set by Admin") + a change-password form, used by both `app/student/profile/page.tsx` (rewritten) and `app/lecturer/profile/page.tsx` (new — Lecturer had no Profile page or nav entry before this).
+
+**Debugging note, third occurrence of the same symptom class**: `teststudent@edusubmit.local`'s password stopped matching its known value again (same as the admin account twice in Phase 5), confirmed via direct DB check with a fresh `manage.py shell` process, single Postgres instance, single `edusubmit` database, 3 total users, no duplication. Reset and re-verified working. Root cause still unidentified — flagged prominently in `PROJECT_STATUS.md` as it's now happened 3 times across Phase 5–6 and could affect real usage, not just my testing.
