@@ -132,10 +132,23 @@ export default function AssignmentsPage() {
     <div>
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <h1 className="h4 fw-bold mb-0">Assignments</h1>
-        <button type="button" className="btn es-btn-primary text-white" onClick={openCreate}>
+        <button
+          type="button"
+          className="btn es-btn-primary text-white"
+          onClick={openCreate}
+          disabled={courses.length === 0}
+          title={courses.length === 0 ? "You need at least one assigned course first" : undefined}
+        >
           + New Assignment
         </button>
       </div>
+
+      {courses.length === 0 && (
+        <div className="es-card bg-white p-4 mb-3 text-muted small">
+          You don&apos;t have any courses assigned yet — ask your administrator to assign one
+          before creating assignments.
+        </div>
+      )}
 
       <div className="d-flex flex-column flex-sm-row gap-2 mb-3">
         <input

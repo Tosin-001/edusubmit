@@ -148,3 +148,17 @@ Why: Upload page dropdowns were empty — no courses/assignments existed. Rather
 **Created** `frontend/components/profile/MyProfile.tsx` — shared read-only profile component (name/email/matric-or-staff-ID/department, labeled "Set by Admin") + a change-password form, used by both `app/student/profile/page.tsx` (rewritten) and `app/lecturer/profile/page.tsx` (new — Lecturer had no Profile page or nav entry before this).
 
 **Debugging note, third occurrence of the same symptom class**: `teststudent@edusubmit.local`'s password stopped matching its known value again (same as the admin account twice in Phase 5), confirmed via direct DB check with a fresh `manage.py shell` process, single Postgres instance, single `edusubmit` database, 3 total users, no duplication. Reset and re-verified working. Root cause still unidentified — flagged prominently in `PROJECT_STATUS.md` as it's now happened 3 times across Phase 5–6 and could affect real usage, not just my testing.
+
+
+## 2026-07-18 (cont'd) — Phase 6, QA pass
+
+**Systematic audit** across all 16 routes for loading states, empty states, and mobile responsiveness (checked for the desktop-table/mobile-card dual-layout pattern, or confirmed the page doesn't need it — stat-card grids and single-column forms reflow naturally via Bootstrap's grid without needing a separate mobile layout).
+
+**Real gaps found and fixed:**
+1. `Modal.tsx` had no Escape-key-to-close (click-outside and the X button worked, Escape didn't) — added, plus `role="dialog"`/`aria-modal`/`aria-label` for screen readers. Affects every modal in the app (Assignments, Users, Courses create/edit).
+2. Student Upload page: an empty course dropdown gave no explanation. Added an empty-state screen ("No courses yet — once your administrator creates courses...") and a warning when a selected course has zero assignments. Fixed the wording to not say "enrolled" — this system has no per-student course enrollment, any student can submit to any course, so "enrolled" would have been actively misleading.
+3. Lecturer Dashboard and Lecturer Assignments: no guidance for a lecturer with zero assigned courses (a normal first-login state, since courses are Admin-assigned). Added explanatory banners; disabled the "New Assignment" button in that state instead of letting it open a form with an empty, unusable course dropdown.
+
+**End-to-end verification** (not just unit-level): ran the full workflow live against the API — Student uploads a real file → appears in Lecturer's Review Queue → Lecturer grades it (88, approved) → Student's dashboard aggregates update correctly (avg grade 84.0 across 3 submissions) → Student sees the grade/feedback → Admin overrides the grade (95) → Student immediately sees the new grade and `reviewed_by: EduSubmit Admin` → `submission.review_overridden` correctly appears in Activity Logs. This confirms the actual product workflow works, not just that each endpoint returns 200 in isolation.
+
+**Scope note**: this QA pass covers code-level review (loading/empty/error states, responsive class usage) and full API-level end-to-end testing. It does not include actual browser rendering/visual screenshot testing at real breakpoints (375px/768px/1024px etc.) — no browser automation tool is available in this environment. Recommend a manual visual pass in Chrome DevTools device toolbar before considering Phase 6 fully closed.

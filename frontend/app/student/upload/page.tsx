@@ -16,6 +16,7 @@ function unwrap<T>(data: Paginated<T> | T[]): T[] {
 export default function UploadPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [courseId, setCourseId] = useState<string>("");
   const [assignmentId, setAssignmentId] = useState<string>("");
@@ -26,7 +27,9 @@ export default function UploadPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    apiFetch<Paginated<Course> | Course[]>("/courses/").then((data) => setCourses(unwrap(data)));
+    apiFetch<Paginated<Course> | Course[]>("/courses/")
+      .then((data) => setCourses(unwrap(data)))
+      .finally(() => setCoursesLoading(false));
   }, []);
 
   useEffect(() => {
@@ -104,6 +107,22 @@ export default function UploadPage() {
     }
   }
 
+  if (coursesLoading) {
+    return <div className="text-muted">Loading…</div>;
+  }
+
+  if (courses.length === 0) {
+    return (
+      <div className="es-card bg-white p-4 p-md-5 text-center" style={{ maxWidth: 480 }}>
+        <h1 className="h5 fw-bold mb-2">No courses yet</h1>
+        <p className="text-muted mb-0">
+          No courses have been set up yet. Once your administrator creates courses and
+          assignments, they&apos;ll appear here to submit against.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="es-card bg-white p-4 p-md-5" style={{ maxWidth: 640 }}>
       <h1 className="h5 fw-bold mb-4">Upload Assignment</h1>
@@ -149,6 +168,11 @@ export default function UploadPage() {
           </select>
           {selectedAssignment?.description && (
             <div className="form-text">{selectedAssignment.description}</div>
+          )}
+          {courseId && assignments.length === 0 && (
+            <div className="form-text text-warning">
+              No assignments have been posted for this course yet.
+            </div>
           )}
         </div>
 

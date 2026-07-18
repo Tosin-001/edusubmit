@@ -40,6 +40,13 @@ export default function LecturerDashboardPage() {
           <StatCard label="Reviewed" value={stats?.reviewed ?? 0} />
         </div>
       </div>
+
+      {stats?.total_courses === 0 && (
+        <div className="es-card bg-white p-4 mt-4 text-muted small">
+          You don&apos;t have any courses assigned yet. Once your administrator assigns you a
+          course, you&apos;ll be able to create assignments and review submissions for it.
+        </div>
+      )}
     </div>
   );
 }
