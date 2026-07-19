@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdmin, IsLecturer, IsLecturerOrAdmin, IsStudent
+from accounts.permissions import IsAdmin, IsTeacher, IsTeacherOrAdmin, IsStudent
 from activitylogs.utils import log_action
 from .models import Submission
 from .serializers import (
@@ -15,6 +15,19 @@ from .serializers import (
     SubmissionListSerializer,
     SubmissionReviewSerializer,
 )
+
+
+def _is_owning_teacher(user, assignment):
+    """
+    True if `user` is the teacher for this assignment, checking both the new
+    TeacherAssignment path and the deprecated course.lecturer path (so
+    pre-pivot assignments a teacher created are still reviewable by them).
+    """
+    if assignment.teacher_assignment_id and assignment.teacher_assignment.teacher_id == user.id:
+        return True
+    if assignment.course_id and assignment.course.lecturer_id == user.id:
+        return True
+    return False
 
 
 # ---------- Student ----------
@@ -31,24 +44,26 @@ class SubmissionCreateView(generics.CreateAPIView):
 
 
 class StudentSubmissionListView(generics.ListAPIView):
-    """GET /students/me/submissions/ — own submissions, filterable by status/course."""
+    """GET /students/me/submissions/ — own submissions, filterable by status/subject."""
 
     serializer_class = SubmissionListSerializer
     permission_classes = [IsStudent]
-    filterset_fields = ["status", "assignment__course"]
-    search_fields = ["assignment__title", "assignment__course__course_code"]
+    filterset_fields = ["status", "assignment__course", "assignment__teacher_assignment"]
+    search_fields = ["assignment__title", "assignment__course__code", "assignment__course__name"]
 
     def get_queryset(self):
         return Submission.objects.filter(student=self.request.user).select_related(
-            "assignment", "assignment__course"
+            "assignment", "assignment__course", "assignment__teacher_assignment__subject",
+            "assignment__teacher_assignment__school_class",
         )
 
 
 class SubmissionDetailView(generics.RetrieveAPIView):
     """
-    GET /submissions/{id}/ — student sees own; lecturer sees own-course; admin sees all.
-    Object-level access enforced in get_queryset (404 rather than 403 for non-owners,
-    which avoids confirming a submission's existence to someone with no access to it).
+    GET /submissions/{id}/ — student sees own; teacher sees own subject/class
+    (or deprecated own-course); admin sees all. Object-level access enforced
+    in get_queryset (404 rather than 403 for non-owners, which avoids
+    confirming a submission's existence to someone with no access to it).
     """
 
     serializer_class = SubmissionDetailSerializer
@@ -56,11 +71,15 @@ class SubmissionDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Submission.objects.select_related("assignment", "assignment__course", "student", "reviewed_by")
+        qs = Submission.objects.select_related(
+            "assignment", "assignment__course", "assignment__teacher_assignment", "student", "reviewed_by"
+        )
         if user.is_admin_role:
             return qs
-        if user.is_lecturer:
-            return qs.filter(assignment__course__lecturer=user)
+        if user.is_teacher:
+            return qs.filter(
+                Q(assignment__teacher_assignment__teacher=user) | Q(assignment__course__lecturer=user)
+            )
         return qs.filter(student=user)
 
 
@@ -78,33 +97,40 @@ class StudentDashboardView(APIView):
         })
 
 
-# ---------- Lecturer ----------
+# ---------- Teacher ----------
 
-class LecturerSubmissionListView(generics.ListAPIView):
-    """GET /lecturers/me/submissions/ — submissions to the lecturer's own courses."""
+class TeacherSubmissionListView(generics.ListAPIView):
+    """GET /teachers/me/submissions/ — submissions to the teacher's own Subject x Class assignments."""
 
     serializer_class = SubmissionDetailSerializer
-    permission_classes = [IsLecturer]
-    filterset_fields = ["status", "assignment__course"]
-    search_fields = ["student__full_name", "student__matric_number", "assignment__course__course_code"]
+    permission_classes = [IsTeacher]
+    filterset_fields = ["status", "assignment__teacher_assignment", "assignment__course"]
+    search_fields = ["student__full_name", "student__matric_number", "assignment__teacher_assignment__subject__name"]
 
     def get_queryset(self):
-        return Submission.objects.filter(assignment__course__lecturer=self.request.user).select_related(
-            "assignment", "assignment__course", "student"
-        )
+        user = self.request.user
+        return Submission.objects.filter(
+            Q(assignment__teacher_assignment__teacher=user) | Q(assignment__course__lecturer=user)
+        ).select_related("assignment", "assignment__teacher_assignment", "assignment__course", "student")
 
 
-class LecturerDashboardView(APIView):
-    permission_classes = [IsLecturer]
+class TeacherDashboardView(APIView):
+    permission_classes = [IsTeacher]
 
     def get(self, request):
-        qs = Submission.objects.filter(assignment__course__lecturer=request.user)
+        user = request.user
+        qs = Submission.objects.filter(
+            Q(assignment__teacher_assignment__teacher=user) | Q(assignment__course__lecturer=user)
+        )
         return Response({
-            "total_courses": request.user.courses_taught.count(),
-            "total_assignments": request.user.assignments_created.count(),
+            "total_assignments_taught": user.teaching_assignments.count(),
+            "total_assignments": user.assignments_created.count() + user.teaching_assignments.aggregate(
+                n=Count("assignments")
+            )["n"],
             "pending_review": qs.filter(status__in=["submitted", "under_review"]).count(),
             "reviewed": qs.filter(status__in=["reviewed", "approved", "rejected"]).count(),
         })
+
 
 import django.utils.timezone as tz
 
@@ -112,23 +138,24 @@ import django.utils.timezone as tz
 class SubmissionReviewView(generics.UpdateAPIView):
     """
     PATCH /submissions/{id}/review/
-    Lecturer: only for submissions under their own course.
-    Admin: any submission, including overriding a Lecturer's existing review
-    (per project decision, 2026-07-14 — see PROJECT_STATUS.md).
+    Teacher: only for submissions under their own Subject/Class assignment
+    (or deprecated own-course assignment). Admin: any submission, including
+    overriding a Teacher's existing review (per project decision — see
+    PROJECT_STATUS.md).
     """
 
     serializer_class = SubmissionReviewSerializer
-    permission_classes = [IsLecturerOrAdmin]
+    permission_classes = [IsTeacherOrAdmin]
     http_method_names = ["patch"]
 
     def get_queryset(self):
-        return Submission.objects.select_related("assignment__course")
+        return Submission.objects.select_related("assignment__course", "assignment__teacher_assignment")
 
     def get_object(self):
         obj = get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
         user = self.request.user
-        if user.is_lecturer and obj.assignment.course.lecturer_id != user.id:
-            raise PermissionDenied("You can only review submissions for your own courses.")
+        if user.is_teacher and not _is_owning_teacher(user, obj.assignment):
+            raise PermissionDenied("You can only review submissions for your own Subject/Class assignments.")
         return obj
 
     def perform_update(self, serializer):
@@ -148,18 +175,24 @@ class SubmissionReviewView(generics.UpdateAPIView):
 class AdminSubmissionListView(generics.ListAPIView):
     """
     GET /admin/submissions/ — all submissions.
-    Filter: ?status=, ?assignment__course=, ?assignment__lecturer=, ?student=
-    Search: ?search= (student name/matric, course code)
+    Filter: ?status=, ?assignment__course=, ?assignment__teacher_assignment=,
+            ?assignment__teacher_assignment__teacher=, ?student=
+    Search: ?search= (student name/matric, subject name/code)
     Date range: ?date_from=YYYY-MM-DD, ?date_to=YYYY-MM-DD
     """
 
     serializer_class = SubmissionDetailSerializer
     permission_classes = [IsAdmin]
-    filterset_fields = ["status", "assignment__course", "assignment__lecturer", "student"]
-    search_fields = ["student__full_name", "student__matric_number", "assignment__course__course_code"]
+    filterset_fields = [
+        "status", "assignment__course", "assignment__teacher_assignment",
+        "assignment__teacher_assignment__teacher", "student",
+    ]
+    search_fields = ["student__full_name", "student__matric_number", "assignment__teacher_assignment__subject__name"]
 
     def get_queryset(self):
-        qs = Submission.objects.select_related("assignment", "assignment__course", "student", "reviewed_by")
+        qs = Submission.objects.select_related(
+            "assignment", "assignment__course", "assignment__teacher_assignment", "student", "reviewed_by"
+        )
         date_from = self.request.query_params.get("date_from")
         date_to = self.request.query_params.get("date_to")
         if date_from:
@@ -195,19 +228,20 @@ class AdminDashboardView(APIView):
 
 
 class SubmissionDownloadView(APIView):
-    """GET /submissions/{id}/download/ — owner, course lecturer, or admin."""
+    """GET /submissions/{id}/download/ — owner, owning teacher, or admin."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
         submission = get_object_or_404(
-            Submission.objects.select_related("assignment__course", "student"), pk=pk
+            Submission.objects.select_related("assignment__course", "assignment__teacher_assignment", "student"),
+            pk=pk,
         )
         user = request.user
         allowed = (
             user.is_admin_role
             or submission.student_id == user.id
-            or (user.is_lecturer and submission.assignment.course.lecturer_id == user.id)
+            or (user.is_teacher and _is_owning_teacher(user, submission.assignment))
         )
         if not allowed:
             raise PermissionDenied("You do not have access to this file.")

@@ -35,3 +35,18 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
     def get_is_past_due(self, obj):
         return bool(obj.due_date and obj.due_date < timezone.now())
+
+
+class AssignmentCreateSerializer(serializers.ModelSerializer):
+    """
+    Used for POST only. Deliberately has NO subject/class fields — per spec,
+    a Teacher opens a specific "Mathematics — JS1" context (a TeacherAssignment)
+    and everything else (subject, class, teacher) is derived from that, not
+    chosen here. See assignments/views.py perform_create for the ownership check.
+    """
+
+    class Meta:
+        model = Assignment
+        fields = ["id", "teacher_assignment", "title", "description", "due_date", "max_score"]
+        read_only_fields = ["id"]
+        extra_kwargs = {"teacher_assignment": {"required": True}}

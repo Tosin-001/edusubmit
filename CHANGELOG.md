@@ -200,3 +200,20 @@ Upload whitelist tightened to PDF/DOC/DOCX (zip removed) per the explicit "Allow
 
 ### Verified end-to-end (what you can actually trust right now)
 `manage.py check` clean, `manage.py makemigrations --check --dry-run` clean (model state and migration state match exactly), `migrate` applied all 6 new migrations against the real DB with zero data loss (spot-checked every table). Live API test: Admin creates Class→Subject→TeacherAssignment, Teacher sees only their own assignment, Teacher blocked from self-assigning.
+
+
+## 2026-07-19 (cont'd) — Phase B complete: the actual class-scoped workflow
+
+**Rewired `assignments/views.py`**: new `AssignmentCreateSerializer` (title/description/due_date/max_score/`teacher_assignment` only — no Subject or Class field, matching the spec's "no dropdowns" requirement exactly). `perform_create` validates the teacher owns the `TeacherAssignment` they're posting under (403 otherwise). `get_queryset` is now role-scoped: Teacher sees only their own TeacherAssignments' assignments; Student sees only assignments matching their own `school_class` (empty list if no class assigned — a safe default, not an error); Admin sees everything including pre-pivot data.
+
+**Rewired `submissions/views.py`**: `LecturerSubmissionListView`→`TeacherSubmissionListView`, `LecturerDashboardView`→`TeacherDashboardView` (names now match the pivot, not just internal aliases). Every ownership check (Review Queue, submission detail, review, download) now uses a combined check — new `TeacherAssignment` path OR the deprecated `course.lecturer` path — via a shared `_is_owning_teacher()` helper, so a teacher can still review pre-pivot submissions they originally owned, not just new ones.
+
+**Verified live, the full new-model loop**:
+1. Teacher creates "Algebra Homework 1" via `teacher_assignment=1` only — no course, no lecturer, no subject/class field in the payload at all (201)
+2. Admin assigns `teststudent` to class JS1
+3. That student's `/assignments/` now returns exactly 1 result (the new one) — **and correctly excludes both pre-pivot assignments**, confirming class-scoping works and the "don't fake-backfill old data" decision from Phase A behaves as intended, not as a bug
+4. A second student created with **no class assigned** sees 0 assignments — confirms the safe-default behavior
+5. Student uploads → Teacher's Review Queue shows exactly 1 pending item → Teacher grades it (200) → both dashboards (`/teachers/me/dashboard/`, `/admin/dashboard/`) return correct, non-crashing aggregate stats
+
+### Still not done (unchanged from the Phase A note, now shorter)
+Frontend (Phase C), landing page + admin route separation (Phase D), broader security review (Phase E). Backend is now functionally complete for the core "Admin sets up Class/Subject/TeacherAssignment → Teacher creates assignment → Student (class-scoped) submits → Teacher grades" loop from your validation checklist — items 1–9 of your 10-step list are now genuinely exercisable via the API. Item 10 (Activity Log records all actions) — assignment.created/reviewed/etc. logging already existed and is unchanged, confirmed still firing during the test above.

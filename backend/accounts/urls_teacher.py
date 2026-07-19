@@ -2,18 +2,15 @@ from django.urls import path
 
 from academics.views import MyTeacherAssignmentsView
 from assignments.views import AssignmentListCreateView
-from submissions.views import LecturerDashboardView, LecturerSubmissionListView
+from submissions.views import TeacherDashboardView, TeacherSubmissionListView
 from .views import MeView
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="teacher-me"),
-    path("me/dashboard/", LecturerDashboardView.as_view(), name="teacher-dashboard"),
-    # New: the Teacher's own Subject x Class assignments (secondary-school pivot).
+    path("me/dashboard/", TeacherDashboardView.as_view(), name="teacher-dashboard"),
+    # The teacher's own Subject x Class assignments (TeacherAssignment rows).
     path("me/assignments-taught/", MyTeacherAssignmentsView.as_view(), name="teacher-assignments-taught"),
-    # NOTE (pivot in progress): the two endpoints below still operate on the
-    # deprecated Assignment.course/lecturer fields, not the new
-    # TeacherAssignment model. Full rewire to the class-scoped workflow is
-    # pending — see PROJECT_STATUS.md "Phase B".
+    # Now correctly class-scoped: /assignments/ filters by teacher_assignment__teacher for teachers.
     path("me/assignments/", AssignmentListCreateView.as_view(), name="teacher-assignments"),
-    path("me/submissions/", LecturerSubmissionListView.as_view(), name="teacher-submissions"),
+    path("me/submissions/", TeacherSubmissionListView.as_view(), name="teacher-submissions"),
 ]
