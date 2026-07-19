@@ -186,7 +186,7 @@ class AdminDashboardView(APIView):
         qs = Submission.objects.all()
         return Response({
             "total_students": User.objects.filter(role="student").count(),
-            "total_lecturers": User.objects.filter(role="lecturer").count(),
+            "total_teachers": User.objects.filter(role="teacher").count(),
             "total_assignments": qs.values("assignment").distinct().count(),
             "pending_review": qs.filter(status__in=["submitted", "under_review"]).count(),
             "reviewed": qs.filter(status__in=["reviewed", "approved", "rejected"]).count(),

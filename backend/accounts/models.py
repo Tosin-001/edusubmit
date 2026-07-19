@@ -7,7 +7,7 @@ from .managers import UserManager
 class User(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         STUDENT = "student", "Student"
-        LECTURER = "lecturer", "Lecturer"
+        TEACHER = "teacher", "Teacher"
         ADMIN = "admin", "Admin"
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
@@ -16,6 +16,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     matric_number = models.CharField(max_length=30, unique=True, null=True, blank=True)
     staff_id = models.CharField(max_length=30, unique=True, null=True, blank=True)
     department = models.CharField(max_length=100, null=True, blank=True)
+    school_class = models.ForeignKey(
+        "academics.SchoolClass",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="students",
+        help_text="Meaningful for Student role only — the one class a student belongs to.",
+    )
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -38,8 +46,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role == self.Role.STUDENT
 
     @property
+    def is_teacher(self):
+        return self.role == self.Role.TEACHER
+
+    # Backward-compatible alias during the secondary-school pivot — remove once
+    # all call sites are confirmed migrated off the old name.
+    @property
     def is_lecturer(self):
-        return self.role == self.Role.LECTURER
+        return self.is_teacher
 
     @property
     def is_admin_role(self):

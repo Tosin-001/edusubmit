@@ -162,3 +162,41 @@ Why: Upload page dropdowns were empty — no courses/assignments existed. Rather
 **End-to-end verification** (not just unit-level): ran the full workflow live against the API — Student uploads a real file → appears in Lecturer's Review Queue → Lecturer grades it (88, approved) → Student's dashboard aggregates update correctly (avg grade 84.0 across 3 submissions) → Student sees the grade/feedback → Admin overrides the grade (95) → Student immediately sees the new grade and `reviewed_by: EduSubmit Admin` → `submission.review_overridden` correctly appears in Activity Logs. This confirms the actual product workflow works, not just that each endpoint returns 200 in isolation.
 
 **Scope note**: this QA pass covers code-level review (loading/empty/error states, responsive class usage) and full API-level end-to-end testing. It does not include actual browser rendering/visual screenshot testing at real breakpoints (375px/768px/1024px etc.) — no browser automation tool is available in this environment. Recommend a manual visual pass in Chrome DevTools device toolbar before considering Phase 6 fully closed.
+
+
+## 2026-07-19 — Secondary School pivot, Phase A (models/migrations) + partial Phase B (backend unblock)
+
+**Scope note**: the pivot request is large — full Lecturer→Teacher and Course→Subject rename across every layer, two new models, a redesigned assignment-creation workflow, class-scoped visibility, a public landing page, and a security review. Completing all of it in one pass isn't realistic while keeping the same verify-every-step standard used throughout this project. This entry covers what's actually done and verified; remaining work is listed explicitly below, not implied as finished.
+
+### New models (backend/academics/models.py)
+- `Subject` — renamed from `Course` via `RenameModel` (preserves all rows/IDs). `course_code`→`code` (now optional), `course_title`→`name`. `lecturer`/`semester` kept but deprecated (nullable, unused by new code, not dropped).
+- `SchoolClass` (new) — e.g. "JS1", "SS2 Science". Admin creates/edits/archives; no hardcoded values.
+- `TeacherAssignment` (new) — the Teacher x Subject x Class triple. One teacher per (subject, class) pair. Admin-only write, verified live that a Teacher cannot self-assign (403).
+
+### Data migration (real, not just a rename)
+`User.Role.LECTURER` → `Role.TEACHER` (value `'lecturer'`→`'teacher'`) required a `RunPython` data migration to rewrite existing rows — a code-only rename would have silently broken `is_teacher` for the existing teacher account. Verified: `lecturer@edusubmit.local`'s role is now `teacher`, `is_teacher=True`.
+
+### Assignment model
+Added `teacher_assignment` FK (nullable). **Deliberately not auto-backfilled** — pre-pivot assignments (the two "CSC301"/"CSC302" test assignments) have no natural Class mapping, so inventing one would be dishonest data, not data preservation. They keep their data via the deprecated `course`/`lecturer` fields and remain in Django admin; they simply won't appear in the new class-scoped Teacher/Student views once those are built. Verified: both assignments and all 3 submissions survived the migration intact.
+
+### Security (from the pivot's security section)
+Upload whitelist tightened to PDF/DOC/DOCX (zip removed) per the explicit "Allow: PDF, DOC, DOCX" requirement — `submissions/models.py` `FileExtensionValidator` + a migration. Existing zip submissions untouched, only affects new uploads.
+
+### New/updated endpoints (all verified live)
+- `POST/GET /api/v1/subjects/`, `/api/v1/classes/`, `/api/v1/teacher-assignments/` (Admin write, authenticated read) — verified: created "JS1" (201), "Mathematics" (201), a TeacherAssignment linking them to the existing teacher (201)
+- `GET /api/v1/teachers/me/assignments-taught/` — verified: teacher sees exactly their own Subject x Class assignment (200, 1 result)
+- `POST /api/v1/teacher-assignments/` as a Teacher → correctly 403 (teachers cannot assign themselves)
+- URL namespace: `/api/v1/lecturers/`→`/api/v1/teachers/` (file renamed `urls_lecturer.py`→`urls_teacher.py`, old file backed up), `/api/v1/courses/`→`/api/v1/subjects/` + new `/classes/`, `/teacher-assignments/`
+- `IsLecturer`/`IsLecturerOrAdmin` permission classes → `IsTeacher`/`IsTeacherOrAdmin` (old names kept as aliases, not yet purged)
+
+### Explicitly NOT done yet (do not assume these work)
+1. **Assignment creation still uses the old Subject+Teacher direct picker**, not the new "open Mathematics—JS1, no dropdowns" workflow from the spec. `assignments/views.py` and `assignments/urls.py` are unchanged.
+2. **Student visibility is not yet class-scoped** — students still see all assignments platform-wide, not filtered to their own `school_class`. `User.school_class` field exists but nothing reads it yet.
+3. **Review Queue is not yet scoped by TeacherAssignment** — still filters via the deprecated `course.lecturer` path.
+4. **Frontend is entirely unchanged** — still says "Lecturer"/"Course" everywhere, still calls `/lecturers/`, `/courses/` (now 404) — **the Admin Courses page and Lecturer nav/dashboard will visibly break** until frontend is rewired.
+5. **No public landing page, no `/admin-login` separation** — not started.
+6. **Admin frontend has no UI yet for Classes/Subjects(renamed)/TeacherAssignments** — API-only, reachable via Django admin or direct API calls for now.
+7. Broader security review (cookie flags, cross-role access re-audit against the new models) not yet done.
+
+### Verified end-to-end (what you can actually trust right now)
+`manage.py check` clean, `manage.py makemigrations --check --dry-run` clean (model state and migration state match exactly), `migrate` applied all 6 new migrations against the real DB with zero data loss (spot-checked every table). Live API test: Admin creates Class→Subject→TeacherAssignment, Teacher sees only their own assignment, Teacher blocked from self-assigning.

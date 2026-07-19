@@ -6,9 +6,9 @@ class IsStudent(BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_student)
 
 
-class IsLecturer(BasePermission):
+class IsTeacher(BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_lecturer)
+        return bool(request.user and request.user.is_authenticated and request.user.is_teacher)
 
 
 class IsAdmin(BasePermission):
@@ -16,7 +16,13 @@ class IsAdmin(BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_admin_role)
 
 
-class IsLecturerOrAdmin(BasePermission):
+class IsTeacherOrAdmin(BasePermission):
     def has_permission(self, request, view):
         u = request.user
-        return bool(u and u.is_authenticated and (u.is_lecturer or u.is_admin_role))
+        return bool(u and u.is_authenticated and (u.is_teacher or u.is_admin_role))
+
+
+# Backward-compatible aliases during the secondary-school pivot — remove once
+# all call sites are confirmed migrated off the old names (see PROJECT_STATUS.md).
+IsLecturer = IsTeacher
+IsLecturerOrAdmin = IsTeacherOrAdmin

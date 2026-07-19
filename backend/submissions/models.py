@@ -9,7 +9,18 @@ from assignments.models import Assignment
 
 
 def submission_upload_path(instance, filename):
-    return f"submissions/{instance.assignment.course.course_code}/{instance.student_id}/{filename}"
+    """
+    Prefers the new teacher_assignment (Subject x Class) for folder naming;
+    falls back to the deprecated course field for pre-pivot assignments.
+    """
+    assignment = instance.assignment
+    if assignment.teacher_assignment_id:
+        folder = f"{assignment.teacher_assignment.subject.name}-{assignment.teacher_assignment.school_class.name}"
+    elif assignment.course_id:
+        folder = assignment.course.code or assignment.course.name
+    else:
+        folder = "unassigned"
+    return f"submissions/{folder}/{instance.student_id}/{filename}"
 
 
 def validate_file_size(value):
@@ -33,7 +44,7 @@ class Submission(models.Model):
     )
     file = models.FileField(
         upload_to=submission_upload_path,
-        validators=[FileExtensionValidator(["pdf", "docx", "doc", "zip"]), validate_file_size],
+        validators=[FileExtensionValidator(["pdf", "docx", "doc"]), validate_file_size],
     )
     file_name = models.CharField(max_length=255, blank=True)
     file_size_kb = models.PositiveIntegerField(default=0)

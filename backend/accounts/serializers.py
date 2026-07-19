@@ -22,19 +22,22 @@ class StudentRegisterSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    school_class_name = serializers.CharField(source="school_class.name", read_only=True, default=None)
+
     class Meta:
         model = User
         fields = [
             "id", "role", "full_name", "email", "matric_number",
-            "staff_id", "department", "is_active", "created_at",
+            "staff_id", "department", "school_class", "school_class_name",
+            "is_active", "created_at",
         ]
         read_only_fields = ["id", "role", "created_at"]
 
 
 class AdminCreateUserSerializer(serializers.ModelSerializer):
     """
-    Admin-only: create a Student, Lecturer, or Admin account directly (no
-    public signup for lecturer/admin; this also gives Admin a way to create
+    Admin-only: create a Student, Teacher, or Admin account directly (no
+    public signup for teacher/admin; this also gives Admin a way to create
     a student without the student self-registering).
     """
 
@@ -42,15 +45,18 @@ class AdminCreateUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "full_name", "matric_number", "staff_id", "email", "department", "role", "password"]
+        fields = [
+            "id", "full_name", "matric_number", "staff_id", "email",
+            "department", "school_class", "role", "password",
+        ]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
         role = attrs.get("role")
         if role == User.Role.STUDENT and not attrs.get("matric_number"):
             raise serializers.ValidationError({"matric_number": "Required for student accounts."})
-        if role in (User.Role.LECTURER, User.Role.ADMIN) and not attrs.get("staff_id"):
-            raise serializers.ValidationError({"staff_id": "Required for lecturer/admin accounts."})
+        if role in (User.Role.TEACHER, User.Role.ADMIN) and not attrs.get("staff_id"):
+            raise serializers.ValidationError({"staff_id": "Required for teacher/admin accounts."})
         return attrs
 
     def create(self, validated_data):
