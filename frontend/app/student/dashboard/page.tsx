@@ -63,7 +63,7 @@ export default function StudentDashboardPage() {
             {recent.map((s) => (
               <li key={s.id} className="d-flex justify-content-between align-items-center py-2 border-bottom">
                 <span>
-                  {s.course_code} — {s.assignment_title}
+                  {s.subject_name} ({s.class_name}) — {s.assignment_title}
                 </span>
                 <StatusBadge status={s.status} />
               </li>

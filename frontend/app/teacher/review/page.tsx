@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, downloadFile, ApiError } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import type { Course, Submission, SubmissionStatus } from "@/lib/types";
+import type { Submission, SubmissionStatus, TeacherAssignment } from "@/lib/types";
 
 interface Paginated<T> {
   results?: T[];
@@ -14,11 +14,7 @@ function unwrap<T>(data: Paginated<T> | T[]): T[] {
 }
 
 const STATUS_OPTIONS: SubmissionStatus[] = [
-  "submitted",
-  "under_review",
-  "reviewed",
-  "approved",
-  "rejected",
+  "submitted", "under_review", "reviewed", "approved", "rejected",
 ];
 
 const STATUS_FILTERS: { value: SubmissionStatus | ""; label: string }[] = [
@@ -30,8 +26,8 @@ const STATUS_FILTERS: { value: SubmissionStatus | ""; label: string }[] = [
 ];
 
 export default function ReviewQueuePage() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [activeCourse, setActiveCourse] = useState<string>("all");
+  const [assignmentsTaught, setAssignmentsTaught] = useState<TeacherAssignment[]>([]);
+  const [activeTA, setActiveTA] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "">("");
 
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -42,29 +38,26 @@ export default function ReviewQueuePage() {
   const [saved, setSaved] = useState(false);
 
   const [form, setForm] = useState({
-    status: "submitted" as SubmissionStatus,
-    grade: "",
-    feedback: "",
-    review_notes: "",
+    status: "submitted" as SubmissionStatus, grade: "", feedback: "", review_notes: "",
   });
 
   useEffect(() => {
-    apiFetch<Paginated<Course> | Course[]>("/lecturers/me/courses/").then((data) =>
-      setCourses(unwrap(data))
+    apiFetch<Paginated<TeacherAssignment> | TeacherAssignment[]>("/teachers/me/assignments-taught/").then(
+      (data) => setAssignmentsTaught(unwrap(data))
     );
   }, []);
 
   function loadList() {
     setLoading(true);
     const params = new URLSearchParams({ ordering: "-submitted_at" });
-    if (activeCourse !== "all") params.set("assignment__course", activeCourse);
+    if (activeTA !== "all") params.set("assignment__teacher_assignment", activeTA);
     if (statusFilter) params.set("status", statusFilter);
-    apiFetch<Paginated<Submission> | Submission[]>(`/lecturers/me/submissions/?${params}`)
+    apiFetch<Paginated<Submission> | Submission[]>(`/teachers/me/submissions/?${params}`)
       .then((data) => setSubmissions(unwrap(data)))
       .finally(() => setLoading(false));
   }
 
-  useEffect(loadList, [activeCourse, statusFilter]);
+  useEffect(loadList, [activeTA, statusFilter]);
 
   useEffect(() => {
     if (!selected) return;
@@ -124,20 +117,20 @@ export default function ReviewQueuePage() {
         <li className="nav-item">
           <button
             type="button"
-            className={`nav-link ${activeCourse === "all" ? "active" : ""}`}
-            onClick={() => setActiveCourse("all")}
+            className={`nav-link ${activeTA === "all" ? "active" : ""}`}
+            onClick={() => setActiveTA("all")}
           >
             All
           </button>
         </li>
-        {courses.map((c) => (
-          <li className="nav-item" key={c.id}>
+        {assignmentsTaught.map((ta) => (
+          <li className="nav-item" key={ta.id}>
             <button
               type="button"
-              className={`nav-link ${activeCourse === String(c.id) ? "active" : ""}`}
-              onClick={() => setActiveCourse(String(c.id))}
+              className={`nav-link ${activeTA === String(ta.id) ? "active" : ""}`}
+              onClick={() => setActiveTA(String(ta.id))}
             >
-              {c.course_code}
+              {ta.subject_name} — {ta.class_name}
             </button>
           </li>
         ))}
@@ -150,9 +143,7 @@ export default function ReviewQueuePage() {
           onChange={(e) => setStatusFilter(e.target.value as SubmissionStatus | "")}
         >
           {STATUS_FILTERS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       </div>
@@ -169,9 +160,7 @@ export default function ReviewQueuePage() {
                 {submissions.map((s) => (
                   <li
                     key={s.id}
-                    className={`list-group-item list-group-item-action ${
-                      selected?.id === s.id ? "active" : ""
-                    }`}
+                    className={`list-group-item list-group-item-action ${selected?.id === s.id ? "active" : ""}`}
                     role="button"
                     onClick={() => openReview(s)}
                   >
@@ -179,7 +168,7 @@ export default function ReviewQueuePage() {
                       <div>
                         <div className="fw-semibold">{s.student_name ?? "Student"}</div>
                         <div className="small text-muted">
-                          {s.course_code} — {s.assignment_title}
+                          {s.subject_name} ({s.class_name}) — {s.assignment_title}
                         </div>
                       </div>
                       <StatusBadge status={s.status} />
@@ -202,7 +191,7 @@ export default function ReviewQueuePage() {
                 <div>
                   <h2 className="h6 fw-bold mb-1">{selected.assignment_title}</h2>
                   <div className="small text-muted">
-                    {selected.student_name} · {selected.matric_number} · {selected.course_code}
+                    {selected.student_name} · {selected.matric_number} · {selected.subject_name} ({selected.class_name})
                   </div>
                 </div>
                 <button type="button" className="btn btn-outline-primary btn-sm" onClick={handleDownload}>
@@ -218,10 +207,7 @@ export default function ReviewQueuePage() {
                   <div className="col-6">
                     <label className="form-label small fw-semibold">Grade (0–100)</label>
                     <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="form-control"
+                      type="number" min={0} max={100} className="form-control"
                       value={form.grade}
                       onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}
                     />
@@ -231,14 +217,10 @@ export default function ReviewQueuePage() {
                     <select
                       className="form-select"
                       value={form.status}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, status: e.target.value as SubmissionStatus }))
-                      }
+                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as SubmissionStatus }))}
                     >
                       {STATUS_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt.replace("_", " ")}
-                        </option>
+                        <option key={opt} value={opt}>{opt.replace("_", " ")}</option>
                       ))}
                     </select>
                   </div>
@@ -249,8 +231,7 @@ export default function ReviewQueuePage() {
                     Feedback <span className="text-muted fw-normal">(visible to student)</span>
                   </label>
                   <textarea
-                    className="form-control"
-                    rows={3}
+                    className="form-control" rows={3}
                     value={form.feedback}
                     onChange={(e) => setForm((f) => ({ ...f, feedback: e.target.value }))}
                   />
@@ -261,8 +242,7 @@ export default function ReviewQueuePage() {
                     Review Notes <span className="text-muted fw-normal">(internal only)</span>
                   </label>
                   <textarea
-                    className="form-control"
-                    rows={2}
+                    className="form-control" rows={2}
                     value={form.review_notes}
                     onChange={(e) => setForm((f) => ({ ...f, review_notes: e.target.value }))}
                   />

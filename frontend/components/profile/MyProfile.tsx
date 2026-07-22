@@ -14,7 +14,7 @@ export default function MyProfile({
   endpoint,
   idLabel,
 }: {
-  endpoint: "/students/me/" | "/lecturers/me/";
+  endpoint: "/students/me/" | "/teachers/me/";
   idLabel: "Matric Number" | "Staff ID";
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -83,10 +83,17 @@ export default function MyProfile({
             <div className="text-muted small">{idLabel}</div>
             <div className="fw-semibold">{idValue ?? "—"}</div>
           </div>
-          <div className="col-sm-6">
-            <div className="text-muted small">Department</div>
-            <div className="fw-semibold">{profile.department ?? "—"}</div>
-          </div>
+          {idLabel === "Matric Number" ? (
+            <div className="col-sm-6">
+              <div className="text-muted small">Class</div>
+              <div className="fw-semibold">{profile.school_class_name ?? "Not assigned yet"}</div>
+            </div>
+          ) : (
+            <div className="col-sm-6">
+              <div className="text-muted small">Department</div>
+              <div className="fw-semibold">{profile.department ?? "—"}</div>
+            </div>
+          )}
         </div>
         <p className="text-muted small mt-3 mb-0">
           These details are managed by your administrator. If anything here needs to change,

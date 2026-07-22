@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
 import Modal from "@/components/ui/Modal";
-import type { Role, UserProfile } from "@/lib/types";
+import type { Role, SchoolClass, UserProfile } from "@/lib/types";
 
 interface Paginated<T> {
   results?: T[];
@@ -20,11 +20,13 @@ const emptyForm = {
   matric_number: "",
   staff_id: "",
   department: "",
+  school_class: "",
   password: "",
 };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "">("");
@@ -51,6 +53,10 @@ export default function AdminUsersPage() {
 
   useEffect(loadUsers, [search, roleFilter, statusFilter]);
 
+  useEffect(() => {
+    apiFetch<Paginated<SchoolClass> | SchoolClass[]>("/admin/classes/").then((data) => setClasses(unwrap(data)));
+  }, []);
+
   function openCreate() {
     setEditing(null);
     setForm(emptyForm);
@@ -67,6 +73,7 @@ export default function AdminUsersPage() {
       matric_number: u.matric_number ?? "",
       staff_id: u.staff_id ?? "",
       department: u.department ?? "",
+      school_class: u.school_class ? String(u.school_class) : "",
       password: "",
     });
     setError(null);
@@ -87,10 +94,14 @@ export default function AdminUsersPage() {
             matric_number: form.matric_number || null,
             staff_id: form.staff_id || null,
             department: form.department || null,
+            school_class: form.school_class ? Number(form.school_class) : null,
           }),
         });
       } else {
-        await apiFetch("/admin/users/", { method: "POST", body: JSON.stringify(form) });
+        await apiFetch("/admin/users/", {
+          method: "POST",
+          body: JSON.stringify({ ...form, school_class: form.school_class ? Number(form.school_class) : null }),
+        });
       }
       setModalOpen(false);
       loadUsers();
@@ -129,7 +140,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const roleLabel: Record<Role, string> = { student: "Student", lecturer: "Lecturer", admin: "Admin" };
+  const roleLabel: Record<Role, string> = { student: "Student", teacher: "Teacher", admin: "Admin" };
 
   return (
     <div>
@@ -156,7 +167,7 @@ export default function AdminUsersPage() {
         >
           <option value="">All roles</option>
           <option value="student">Student</option>
-          <option value="lecturer">Lecturer</option>
+          <option value="teacher">Teacher</option>
           <option value="admin">Admin</option>
         </select>
         <select
@@ -281,7 +292,7 @@ export default function AdminUsersPage() {
                   onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
                 >
                   <option value="student">Student</option>
-                  <option value="lecturer">Lecturer</option>
+                  <option value="teacher">Teacher</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -309,15 +320,30 @@ export default function AdminUsersPage() {
             </div>
 
             {form.role === "student" ? (
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Matric number</label>
-                <input
-                  className="form-control"
-                  value={form.matric_number}
-                  onChange={(e) => setForm((f) => ({ ...f, matric_number: e.target.value }))}
-                  required
-                />
-              </div>
+              <>
+                <div className="mb-3">
+                  <label className="form-label small fw-semibold">Matric number</label>
+                  <input
+                    className="form-control"
+                    value={form.matric_number}
+                    onChange={(e) => setForm((f) => ({ ...f, matric_number: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label small fw-semibold">Class</label>
+                  <select
+                    className="form-select"
+                    value={form.school_class}
+                    onChange={(e) => setForm((f) => ({ ...f, school_class: e.target.value }))}
+                  >
+                    <option value="">Not assigned yet</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
             ) : (
               <div className="mb-3">
                 <label className="form-label small fw-semibold">Staff ID</label>

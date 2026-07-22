@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError, uploadWithProgress } from "@/lib/api";
-import type { Assignment, Course, Submission } from "@/lib/types";
+import type { Assignment, Submission } from "@/lib/types";
 
 interface Paginated<T> {
   results?: T[];
@@ -15,10 +15,11 @@ function unwrap<T>(data: Paginated<T> | T[]): T[] {
 
 export default function UploadPage() {
   const router = useRouter();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [coursesLoading, setCoursesLoading] = useState(true);
+  // No Subject/Class picker — the backend already returns only assignments
+  // for this student's own class, so there's just one dropdown: which
+  // assignment to submit against.
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [courseId, setCourseId] = useState<string>("");
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true);
   const [assignmentId, setAssignmentId] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -27,21 +28,10 @@ export default function UploadPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    apiFetch<Paginated<Course> | Course[]>("/courses/")
-      .then((data) => setCourses(unwrap(data)))
-      .finally(() => setCoursesLoading(false));
+    apiFetch<Paginated<Assignment> | Assignment[]>("/assignments/")
+      .then((data) => setAssignments(unwrap(data)))
+      .finally(() => setAssignmentsLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!courseId) {
-      setAssignments([]);
-      setAssignmentId("");
-      return;
-    }
-    apiFetch<Paginated<Assignment> | Assignment[]>(`/assignments/?course=${courseId}`).then((data) =>
-      setAssignments(unwrap(data))
-    );
-  }, [courseId]);
 
   const selectedAssignment = useMemo(
     () => assignments.find((a) => String(a.id) === assignmentId) ?? null,
@@ -49,7 +39,7 @@ export default function UploadPage() {
   );
 
   function validateFile(f: File): string | null {
-    const allowed = (selectedAssignment?.allowed_file_types ?? "pdf,docx,doc,zip").split(",");
+    const allowed = (selectedAssignment?.allowed_file_types ?? "pdf,docx,doc").split(",");
     const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
     if (!allowed.includes(ext)) {
       return `File type .${ext} not allowed. Allowed: ${allowed.join(", ")}`;
@@ -82,7 +72,7 @@ export default function UploadPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !assignmentId) {
-      setError("Please choose a course, an assignment, and a file.");
+      setError("Please choose an assignment and a file.");
       return;
     }
     setError(null);
@@ -107,17 +97,17 @@ export default function UploadPage() {
     }
   }
 
-  if (coursesLoading) {
+  if (assignmentsLoading) {
     return <div className="text-muted">Loading…</div>;
   }
 
-  if (courses.length === 0) {
+  if (assignments.length === 0) {
     return (
       <div className="es-card bg-white p-4 p-md-5 text-center" style={{ maxWidth: 480 }}>
-        <h1 className="h5 fw-bold mb-2">No courses yet</h1>
+        <h1 className="h5 fw-bold mb-2">No assignments yet</h1>
         <p className="text-muted mb-0">
-          No courses have been set up yet. Once your administrator creates courses and
-          assignments, they&apos;ll appear here to submit against.
+          Either you haven&apos;t been assigned a class yet, or your teachers haven&apos;t
+          posted any assignments — check with your administrator or teacher.
         </p>
       </div>
     );
@@ -131,48 +121,23 @@ export default function UploadPage() {
       {error && <div className="alert alert-danger py-2">{error}</div>}
 
       <form onSubmit={handleSubmit}>
-        <div className="mb-3">
-          <label className="form-label small fw-semibold">Course</label>
-          <select
-            className="form-select"
-            value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
-            required
-          >
-            <option value="">Select a course…</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.course_code} — {c.course_title}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="mb-4">
           <label className="form-label small fw-semibold">Assignment</label>
           <select
             className="form-select"
             value={assignmentId}
             onChange={(e) => setAssignmentId(e.target.value)}
-            disabled={!courseId}
             required
           >
-            <option value="">
-              {courseId ? "Select an assignment…" : "Choose a course first"}
-            </option>
+            <option value="">Select an assignment…</option>
             {assignments.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.title}
+                {a.subject_name} — {a.title}
               </option>
             ))}
           </select>
           {selectedAssignment?.description && (
             <div className="form-text">{selectedAssignment.description}</div>
-          )}
-          {courseId && assignments.length === 0 && (
-            <div className="form-text text-warning">
-              No assignments have been posted for this course yet.
-            </div>
           )}
         </div>
 
@@ -197,7 +162,7 @@ export default function UploadPage() {
             <>
               <div>Drag & drop file here, or click to browse</div>
               <div className="text-muted small mt-1">
-                {(selectedAssignment?.allowed_file_types ?? "pdf,docx,doc,zip").toUpperCase()} · max{" "}
+                {(selectedAssignment?.allowed_file_types ?? "pdf,docx,doc").toUpperCase()} · max{" "}
                 {selectedAssignment?.max_file_size_mb ?? 15}MB
               </div>
             </>

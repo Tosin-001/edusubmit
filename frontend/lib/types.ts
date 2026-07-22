@@ -1,4 +1,4 @@
-export type Role = "student" | "lecturer" | "admin";
+export type Role = "student" | "teacher" | "admin";
 
 export interface AuthTokens {
   access: string;
@@ -18,25 +18,43 @@ export interface UserProfile {
   matric_number: string | null;
   staff_id: string | null;
   department: string | null;
+  school_class: number | null;
+  school_class_name: string | null;
   is_active: boolean;
   created_at: string;
 }
 
-export interface Course {
+export interface Subject {
   id: number;
-  course_code: string;
-  course_title: string;
-  lecturer: number | null;
-  lecturer_name: string | null;
-  semester: string | null;
+  name: string;
+  code: string | null;
+  is_archived: boolean;
+  created_at: string;
+}
+
+export interface SchoolClass {
+  id: number;
+  name: string;
+  is_archived: boolean;
+  created_at: string;
+}
+
+export interface TeacherAssignment {
+  id: number;
+  teacher: number;
+  teacher_name: string;
+  subject: number;
+  subject_name: string;
+  school_class: number;
+  class_name: string;
   created_at: string;
 }
 
 export interface Assignment {
   id: number;
-  course: number;
-  course_code: string;
-  lecturer: number | null;
+  teacher_assignment: number | null;
+  subject_name: string | null;
+  class_name: string | null;
   title: string;
   description: string;
   due_date: string | null;
@@ -60,7 +78,8 @@ export interface Submission {
   id: number;
   assignment: number;
   assignment_title: string;
-  course_code: string;
+  subject_name?: string | null;
+  class_name?: string | null;
   student?: number;
   student_name?: string;
   matric_number?: string;
@@ -76,7 +95,6 @@ export interface Submission {
   submitted_at: string;
   reviewed_at: string | null;
 }
-
 
 export interface ActivityLog {
   id: number;

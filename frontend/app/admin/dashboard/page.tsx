@@ -6,7 +6,7 @@ import StatCard from "@/components/ui/StatCard";
 
 interface AdminStats {
   total_students: number;
-  total_lecturers: number;
+  total_teachers: number;
   total_assignments: number;
   pending_review: number;
   reviewed: number;
@@ -33,7 +33,7 @@ export default function AdminDashboardPage() {
           <StatCard label="Students" value={stats?.total_students ?? 0} />
         </div>
         <div className="col-6 col-md-3">
-          <StatCard label="Lecturers" value={stats?.total_lecturers ?? 0} />
+          <StatCard label="Teachers" value={stats?.total_teachers ?? 0} />
         </div>
         <div className="col-6 col-md-3">
           <StatCard label="Assignments" value={stats?.total_assignments ?? 0} />

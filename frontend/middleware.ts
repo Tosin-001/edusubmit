@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const ROLE_PREFIXES: Record<string, string> = {
   "/student": "student",
-  "/lecturer": "lecturer",
+  "/teacher": "teacher",
   "/admin": "admin",
 };
 
@@ -30,5 +30,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/student/:path*", "/lecturer/:path*", "/admin/:path*"],
+  matcher: ["/student/:path*", "/teacher/:path*", "/admin/:path*"],
 };

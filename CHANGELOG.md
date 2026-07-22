@@ -217,3 +217,38 @@ Upload whitelist tightened to PDF/DOC/DOCX (zip removed) per the explicit "Allow
 
 ### Still not done (unchanged from the Phase A note, now shorter)
 Frontend (Phase C), landing page + admin route separation (Phase D), broader security review (Phase E). Backend is now functionally complete for the core "Admin sets up Class/Subject/TeacherAssignment → Teacher creates assignment → Student (class-scoped) submits → Teacher grades" loop from your validation checklist — items 1–9 of your 10-step list are now genuinely exercisable via the API. Item 10 (Activity Log records all actions) — assignment.created/reviewed/etc. logging already existed and is unchanged, confirmed still firing during the test above.
+
+
+## 2026-07-20 — Secondary School pivot, Phase C: frontend fully converted
+
+**Full sweep confirmed zero remaining `Course`/`Lecturer` references anywhere in `frontend/` source** (checked via pattern search across every `.tsx`/`.ts` file, not just spot-checked).
+
+### Foundation
+`lib/types.ts` — `Role` is now `student|teacher|admin`; added `Subject`, `SchoolClass`, `TeacherAssignment` types; `Assignment`/`Submission` types now carry `subject_name`/`class_name` instead of `course_code`. `middleware.ts` — route prefix `/lecturer`→`/teacher`.
+
+### Teacher section — rebuilt around cards, not dropdowns
+Old `app/lecturer/*` archived (backup in `/backups`), replaced by `app/teacher/*`:
+- **Dashboard**: shows the teacher's `TeacherAssignment`s as clickable cards ("Mathematics — JS1"), not a dropdown — this is the actual spec requirement, not just a relabel.
+- **`/teacher/classes/[id]`** (new): the "open a class, then Create Assignment" workflow. The create form has exactly 4 fields — title, description, due date, max score — no Subject or Class selector, because those come from the route, not user input.
+- **My Assignments** (aggregate view): search/archive across all the teacher's assignments. Deliberately has no "Create" form of its own — its "+ New Assignment" button routes to the Dashboard, so creation only ever happens in the correct Subject/Class context.
+- **Review Queue**: tabs are now per-`TeacherAssignment` ("Mathematics — JS1") instead of per-course.
+
+### Student section
+`upload` page **simplified, not just relabeled** — since the backend already returns only the student's own class's assignments, the course-picker dropdown is gone entirely; there's one dropdown (which assignment), and it's already correctly scoped server-side. `dashboard`/`submissions` show `subject_name`/`class_name`.
+
+### Admin section
+- **New**: `/admin/subjects` (replaces `/admin/courses`, no Lecturer field — that's `TeacherAssignment`'s job now), `/admin/classes` (new), `/admin/teacher-assignments` (new — assigns Teacher→Subject→Class; deleting one warns explicitly that it cascades to assignments/submissions, since I didn't want a one-click destructive action hidden behind a plain "Remove" button)
+- `/admin/users`: role dropdown/labels renamed; **added a Class field**, shown only when creating/editing a Student (per spec: "Admin assigns the class during Student creation/editing")
+- `/admin/submissions`: filters rebuilt around Subject + Teacher instead of Course + Lecturer
+- `/admin/dashboard`: "Lecturers" stat → "Teachers" (`total_teachers`, matching the backend field)
+- `/admin/logs`: action-label map extended for `subject.*`/`class.*`/`teacher_assignment.*` actions
+- Nav updated: Subjects, Classes, Teacher Assignments all added
+
+### One backend gap caught while wiring the frontend
+`AdminSubmissionListView` had teacher-filtering but no subject-filtering (`assignment__teacher_assignment__subject` was missing from `filterset_fields`) — the Admin Submissions page's Subject dropdown would have silently done nothing. Added.
+
+### Verified
+`npx tsc --noEmit` clean, `npm run build` clean (22 routes, up from 16 — all new admin/teacher pages present, zero `/lecturer` or `/admin/courses` routes remain). Live API verification against every new/changed endpoint the frontend actually calls: Admin Subjects/Classes/TeacherAssignments list shapes match the TypeScript types exactly, Admin can create a student with `school_class` set and gets back an `id` (needed for the immediate follow-up reset-password flow).
+
+### Not done (Phases D–F, unchanged from before)
+Public landing page + `/admin-login` separation, broader security review, your final 10-step validation. **No browser/visual testing was done** — no browser automation tool available in this environment; recommend a manual click-through before deployment, especially the Teacher Dashboard cards → class page → create assignment flow, since that's the biggest UX change.

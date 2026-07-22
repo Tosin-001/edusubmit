@@ -50,7 +50,7 @@ export default function SubmissionsPage() {
         <input
           type="search"
           className="form-control"
-          placeholder="Search by assignment or course…"
+          placeholder="Search by assignment or subject…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -80,7 +80,8 @@ export default function SubmissionsPage() {
               <thead className="table-light">
                 <tr>
                   <th>Assignment</th>
-                  <th>Course</th>
+                  <th>Subject</th>
+                  <th>Class</th>
                   <th>Submitted</th>
                   <th>Status</th>
                   <th>Grade</th>
@@ -91,7 +92,8 @@ export default function SubmissionsPage() {
                 {submissions.map((s) => (
                   <tr key={s.id}>
                     <td>{s.assignment_title}</td>
-                    <td>{s.course_code}</td>
+                    <td>{s.subject_name ?? "—"}</td>
+                    <td>{s.class_name ?? "—"}</td>
                     <td>{formatDate(s.submitted_at)}</td>
                     <td>
                       <StatusBadge status={s.status} />
@@ -113,7 +115,7 @@ export default function SubmissionsPage() {
                 <div className="d-flex justify-content-between align-items-start mb-2">
                   <div>
                     <div className="fw-semibold">{s.assignment_title}</div>
-                    <div className="text-muted small">{s.course_code}</div>
+                    <div className="text-muted small">{s.subject_name} — {s.class_name}</div>
                   </div>
                   <StatusBadge status={s.status} />
                 </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, downloadFile, ApiError } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import type { Course, Submission, SubmissionStatus, UserProfile } from "@/lib/types";
+import type { Subject, Submission, SubmissionStatus, UserProfile } from "@/lib/types";
 
 interface Paginated<T> {
   results?: T[];
@@ -14,22 +14,18 @@ function unwrap<T>(data: Paginated<T> | T[]): T[] {
 }
 
 const STATUS_OPTIONS: SubmissionStatus[] = [
-  "submitted",
-  "under_review",
-  "reviewed",
-  "approved",
-  "rejected",
+  "submitted", "under_review", "reviewed", "approved", "rejected",
 ];
 
 export default function AdminSubmissionsPage() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [lecturers, setLecturers] = useState<UserProfile[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [teachers, setTeachers] = useState<UserProfile[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
-  const [courseFilter, setCourseFilter] = useState("");
-  const [lecturerFilter, setLecturerFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "">("");
 
   const [selected, setSelected] = useState<Submission | null>(null);
@@ -39,9 +35,9 @@ export default function AdminSubmissionsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    apiFetch<Paginated<Course> | Course[]>("/admin/courses/").then((data) => setCourses(unwrap(data)));
-    apiFetch<Paginated<UserProfile> | UserProfile[]>("/admin/users/?role=lecturer").then((data) =>
-      setLecturers(unwrap(data))
+    apiFetch<Paginated<Subject> | Subject[]>("/admin/subjects/").then((data) => setSubjects(unwrap(data)));
+    apiFetch<Paginated<UserProfile> | UserProfile[]>("/admin/users/?role=teacher").then((data) =>
+      setTeachers(unwrap(data))
     );
   }, []);
 
@@ -49,15 +45,15 @@ export default function AdminSubmissionsPage() {
     setLoading(true);
     const params = new URLSearchParams({ ordering: "-submitted_at" });
     if (search) params.set("search", search);
-    if (courseFilter) params.set("assignment__course", courseFilter);
-    if (lecturerFilter) params.set("assignment__lecturer", lecturerFilter);
+    if (subjectFilter) params.set("assignment__teacher_assignment__subject", subjectFilter);
+    if (teacherFilter) params.set("assignment__teacher_assignment__teacher", teacherFilter);
     if (statusFilter) params.set("status", statusFilter);
     apiFetch<Paginated<Submission> | Submission[]>(`/admin/submissions/?${params}`)
       .then((data) => setSubmissions(unwrap(data)))
       .finally(() => setLoading(false));
   }
 
-  useEffect(loadList, [search, courseFilter, lecturerFilter, statusFilter]);
+  useEffect(loadList, [search, subjectFilter, teacherFilter, statusFilter]);
 
   useEffect(() => {
     if (!selected) return;
@@ -130,28 +126,24 @@ export default function AdminSubmissionsPage() {
           <input
             type="search"
             className="form-control"
-            placeholder="Search student, matric, course…"
+            placeholder="Search student, matric, subject…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="col-6 col-md-3">
-          <select className="form-select" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
-            <option value="">All courses</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.course_code}
-              </option>
+          <select className="form-select" value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
+            <option value="">All subjects</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>
         <div className="col-6 col-md-3">
-          <select className="form-select" value={lecturerFilter} onChange={(e) => setLecturerFilter(e.target.value)}>
-            <option value="">All lecturers</option>
-            {lecturers.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.full_name}
-              </option>
+          <select className="form-select" value={teacherFilter} onChange={(e) => setTeacherFilter(e.target.value)}>
+            <option value="">All teachers</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>{t.full_name}</option>
             ))}
           </select>
         </div>
@@ -163,9 +155,7 @@ export default function AdminSubmissionsPage() {
           >
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.replace("_", " ")}
-              </option>
+              <option key={s} value={s}>{s.replace("_", " ")}</option>
             ))}
           </select>
         </div>
@@ -183,9 +173,7 @@ export default function AdminSubmissionsPage() {
                 {submissions.map((s) => (
                   <li
                     key={s.id}
-                    className={`list-group-item list-group-item-action ${
-                      selected?.id === s.id ? "active" : ""
-                    }`}
+                    className={`list-group-item list-group-item-action ${selected?.id === s.id ? "active" : ""}`}
                     role="button"
                     onClick={() => openReview(s)}
                   >
@@ -193,7 +181,7 @@ export default function AdminSubmissionsPage() {
                       <div>
                         <div className="fw-semibold">{s.student_name ?? "Student"}</div>
                         <div className="small text-muted">
-                          {s.course_code} — {s.assignment_title}
+                          {s.subject_name} ({s.class_name}) — {s.assignment_title}
                         </div>
                       </div>
                       <StatusBadge status={s.status} />
@@ -216,19 +204,15 @@ export default function AdminSubmissionsPage() {
                 <div>
                   <h2 className="h6 fw-bold mb-1">{selected.assignment_title}</h2>
                   <div className="small text-muted">
-                    {selected.student_name} · {selected.matric_number} · {selected.course_code}
+                    {selected.student_name} · {selected.matric_number} · {selected.subject_name} ({selected.class_name})
                   </div>
                   {selected.reviewed_by_name && (
                     <div className="small text-muted">Last reviewed by {selected.reviewed_by_name}</div>
                   )}
                 </div>
                 <div className="d-flex gap-2">
-                  <button type="button" className="btn btn-outline-primary btn-sm" onClick={handleDownload}>
-                    Download
-                  </button>
-                  <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleDelete}>
-                    Delete
-                  </button>
+                  <button type="button" className="btn btn-outline-primary btn-sm" onClick={handleDownload}>Download</button>
+                  <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleDelete}>Delete</button>
                 </div>
               </div>
 
@@ -240,10 +224,7 @@ export default function AdminSubmissionsPage() {
                   <div className="col-6">
                     <label className="form-label small fw-semibold">Grade (0–100)</label>
                     <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="form-control"
+                      type="number" min={0} max={100} className="form-control"
                       value={form.grade}
                       onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}
                     />
@@ -253,14 +234,10 @@ export default function AdminSubmissionsPage() {
                     <select
                       className="form-select"
                       value={form.status}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, status: e.target.value as SubmissionStatus }))
-                      }
+                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as SubmissionStatus }))}
                     >
                       {STATUS_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt.replace("_", " ")}
-                        </option>
+                        <option key={opt} value={opt}>{opt.replace("_", " ")}</option>
                       ))}
                     </select>
                   </div>
@@ -271,8 +248,7 @@ export default function AdminSubmissionsPage() {
                     Feedback <span className="text-muted fw-normal">(visible to student)</span>
                   </label>
                   <textarea
-                    className="form-control"
-                    rows={3}
+                    className="form-control" rows={3}
                     value={form.feedback}
                     onChange={(e) => setForm((f) => ({ ...f, feedback: e.target.value }))}
                   />
@@ -283,8 +259,7 @@ export default function AdminSubmissionsPage() {
                     Review Notes <span className="text-muted fw-normal">(internal only)</span>
                   </label>
                   <textarea
-                    className="form-control"
-                    rows={2}
+                    className="form-control" rows={2}
                     value={form.review_notes}
                     onChange={(e) => setForm((f) => ({ ...f, review_notes: e.target.value }))}
                   />

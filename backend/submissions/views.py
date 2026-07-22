@@ -185,7 +185,7 @@ class AdminSubmissionListView(generics.ListAPIView):
     permission_classes = [IsAdmin]
     filterset_fields = [
         "status", "assignment__course", "assignment__teacher_assignment",
-        "assignment__teacher_assignment__teacher", "student",
+        "assignment__teacher_assignment__teacher", "assignment__teacher_assignment__subject", "student",
     ]
     search_fields = ["student__full_name", "student__matric_number", "assignment__teacher_assignment__subject__name"]
 
